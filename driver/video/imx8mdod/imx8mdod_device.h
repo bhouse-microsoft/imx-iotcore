@@ -14,11 +14,9 @@
 //
 //    Kernel mode only.
 //
+#pragma once
 
-#ifndef _MX6DODDEVICE_HPP_
-#define  _MX6DODDEVICE_HPP_ 1
-
-class MX6DOD_DEVICE {
+class DEVICE {
 public: // NONPAGED
 
     static DXGKDDI_RESET_DEVICE DdiResetDevice;
@@ -30,7 +28,7 @@ public: // NONPAGED
     static DXGKDDI_INTERRUPT_ROUTINE DdiInterruptRoutine;
     static DXGKDDI_DPC_ROUTINE DdiDpcRoutine;
 
-    __forceinline MX6DOD_DEVICE (const DEVICE_OBJECT* PhysicalDeviceObjectPtr) :
+    __forceinline DEVICE (const DEVICE_OBJECT* PhysicalDeviceObjectPtr) :
         physicalDeviceObjectPtr(PhysicalDeviceObjectPtr),
         dxgkInterface(),
         dxgkStartInfo(),
@@ -38,10 +36,14 @@ public: // NONPAGED
         dxgkDisplayInfo(),
         dxgkVideoSignalInfo(),
         dxgkCurrentSourceMode(),
+#if 0 // brh
         ipuRegistersPtr(),
+#endif
         frameBufferLength(0),
-        biosFrameBufferPtr(),
-        ipu1Conf(0)
+        biosFrameBufferPtr()
+#if 0 // brh
+        , ipu1Conf(0)
+#endif
     {}
 
 private: // NONPAGED
@@ -55,15 +57,15 @@ private: // NONPAGED
         POWER_COMPONENT_COUNT,
     };
 
-    MX6DOD_DEVICE (const MX6DOD_DEVICE&) = delete;
-    MX6DOD_DEVICE& operator= (const MX6DOD_DEVICE&) = delete;
+    DEVICE (const DEVICE&) = delete;
+    DEVICE& operator= (const DEVICE&) = delete;
 
-    void IpuOn ();
-    void IpuOff ();
-
+#if 0 // brh
     void HdmiPhyOn ();
     void HdmiPhyOff ();
+#endif
 
+#if 0 // brh
     __forceinline void writeIpuRegister (ULONG Offset, ULONG Value) const
     {
         WRITE_REGISTER_NOFENCE_ULONG(
@@ -93,6 +95,7 @@ private: // NONPAGED
         return READ_REGISTER_NOFENCE_UCHAR(reinterpret_cast<UCHAR*>(
             reinterpret_cast<char*>(this->hdmiRegistersPtr) + Offset));
     }
+#endif
 
     const DEVICE_OBJECT* const physicalDeviceObjectPtr;
     DXGKRNL_INTERFACE dxgkInterface;
@@ -102,12 +105,17 @@ private: // NONPAGED
     D3DKMDT_VIDEO_SIGNAL_INFO dxgkVideoSignalInfo;
     D3DKMDT_VIDPN_SOURCE_MODE dxgkCurrentSourceMode;
 
+#if 0 // brh
     PVOID ipuRegistersPtr;
     PVOID hdmiRegistersPtr;
+#endif
+
     SIZE_T frameBufferLength;
     VOID* biosFrameBufferPtr;       // must be freed with MmUnmapIoSpace
 
+#if 0 // brh
     ULONG ipu1Conf;
+#endif
 
 public: // PAGED
 
@@ -182,5 +190,3 @@ private: // PAGED
         const D3DKMDT_VIDPN_PRESENT_PATH* PathPtr
         );
 };
-
-#endif // _MX6DODDEVICE_HPP_

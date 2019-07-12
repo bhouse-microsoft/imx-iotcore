@@ -18,29 +18,27 @@
 //
 // Macros to be used for proper PAGED/NON-PAGED code placement
 //
+#pragma once
 
-#ifndef _MX6DODCOMMON_HPP_
-#define _MX6DODCOMMON_HPP_ 1
-
-#define MX6DOD_NONPAGED_SEGMENT_BEGIN \
+#define NONPAGED_SEGMENT_BEGIN \
     __pragma(code_seg(push)) \
     //__pragma(code_seg(.text))
 
-#define MX6DOD_NONPAGED_SEGMENT_END \
+#define NONPAGED_SEGMENT_END \
     __pragma(code_seg(pop))
 
-#define MX6DOD_PAGED_SEGMENT_BEGIN \
+#define PAGED_SEGMENT_BEGIN \
     __pragma(code_seg(push)) \
     __pragma(code_seg("PAGE"))
 
-#define MX6DOD_PAGED_SEGMENT_END \
+#define PAGED_SEGMENT_END \
     __pragma(code_seg(pop))
 
-#define MX6DOD_INIT_SEGMENT_BEGIN \
+#define INIT_SEGMENT_BEGIN \
     __pragma(code_seg(push)) \
     __pragma(code_seg("INIT"))
 
-#define MX6DOD_INIT_SEGMENT_END \
+#define INIT_SEGMENT_END \
     __pragma(code_seg(pop))
 
 //
@@ -51,17 +49,17 @@
 // NOTE: We can't use standard PAGED_CODE macro as it requires function to be
 // placed in paged segment during compilation.
 //
-#define MX6DOD_ASSERT_MAX_IRQL(Irql) NT_ASSERT(KeGetCurrentIrql() <= (Irql))
-#define MX6DOD_ASSERT_LOW_IRQL() MX6DOD_ASSERT_MAX_IRQL(APC_LEVEL)
+#define ASSERT_MAX_IRQL(Irql) NT_ASSERT(KeGetCurrentIrql() <= (Irql))
+#define ASSERT_LOW_IRQL() ASSERT_MAX_IRQL(APC_LEVEL)
 
 //
 // Pool allocation tags for use by MX6DOD
 //
-enum MX6DOD_ALLOC_TAG : ULONG {
+enum ALLOC_TAG : ULONG {
     TEMP                     = '0DXM', // will be freed in the same routine
     GLOBAL                   = '1DXM',
     DEVICE                   = '2DXM',
-}; // enum MX6DOD_ALLOC_TAG
+}; // enum ALLOC_TAG
 
 //
 // Placement new and delete operators
@@ -78,15 +76,15 @@ void* __cdecl operator new[] ( size_t, _In_ void* Ptr ) throw ();
 void __cdecl operator delete[] ( void*, void* ) throw ();
 
 //
-// class MX6DOD_FINALLY
+// class FINALLY
 //
-class MX6DOD_FINALLY {
+class FINALLY {
 private:
 
-    MX6DOD_FINALLY () = delete;
+    FINALLY () = delete;
 
     template < typename T_OP > class _FINALIZER {
-        friend class MX6DOD_FINALLY;
+        friend class FINALLY;
         T_OP op;
         __forceinline _FINALIZER ( T_OP Op ) throw () : op(Op) {}
     public:
@@ -94,7 +92,7 @@ private:
     }; // class _FINALIZER
 
     template < typename T_OP > class _FINALIZER_EX {
-        friend class MX6DOD_FINALLY;
+        friend class FINALLY;
         bool doNot;
         T_OP op;
         __forceinline _FINALIZER_EX ( T_OP Op, bool DoNot ) throw () : doNot(DoNot), op(Op) {}
@@ -118,6 +116,4 @@ public:
     {
         return _FINALIZER_EX<T_OP>(Op, DoNot);
     }; // DoUnless<...> (...)
-}; // class MX6DOD_FINALLY
-
-#endif // _MX6DODCOMMON_HPP_
+}; // class FINALLY

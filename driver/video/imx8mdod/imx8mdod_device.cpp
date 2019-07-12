@@ -4,13 +4,10 @@
 #include "precomp.h"
 
 #include "imx8mdod_logging.h"
-
-#include "Ipu.h"
-#include "imx6Hdmi.h"
 #include "imx8mdod_common.h"
 #include "imx8mdod_device.h"
 
-MX6DOD_NONPAGED_SEGMENT_BEGIN; //==============================================
+NONPAGED_SEGMENT_BEGIN; //==============================================
 
 void BltBits (
     const void *SourceBitsPtr,
@@ -47,13 +44,13 @@ void BltBits (
 }
 
 _Use_decl_annotations_
-VOID MX6DOD_DEVICE::DdiResetDevice (VOID* const /*MiniportDeviceContextPtr*/)
+VOID DEVICE::DdiResetDevice (VOID* const /*MiniportDeviceContextPtr*/)
 {
     LOG_INFORMATION("DdiResetDevice was called, nothing to do");
 }
 
 _Use_decl_annotations_
-NTSTATUS MX6DOD_DEVICE::DdiSystemDisplayEnable (
+NTSTATUS DEVICE::DdiSystemDisplayEnable (
     VOID* const ContextPtr,
     D3DDDI_VIDEO_PRESENT_TARGET_ID TargetId,
     DXGKARG_SYSTEM_DISPLAY_ENABLE_FLAGS* /*FlagsPtr*/,
@@ -62,7 +59,7 @@ NTSTATUS MX6DOD_DEVICE::DdiSystemDisplayEnable (
     D3DDDIFORMAT* ColorFormatPtr
     )
 {
-    auto thisPtr = static_cast<MX6DOD_DEVICE*>(ContextPtr);
+    auto thisPtr = static_cast<DEVICE*>(ContextPtr);
 
     UNREFERENCED_PARAMETER(TargetId);
     NT_ASSERT(TargetId == 0);
@@ -75,7 +72,7 @@ NTSTATUS MX6DOD_DEVICE::DdiSystemDisplayEnable (
 }
 
 _Use_decl_annotations_
-VOID MX6DOD_DEVICE::DdiSystemDisplayWrite (
+VOID DEVICE::DdiSystemDisplayWrite (
     VOID* const ContextPtr,
     VOID* SourcePtr,
     UINT SourceWidth,
@@ -85,7 +82,7 @@ VOID MX6DOD_DEVICE::DdiSystemDisplayWrite (
     UINT PositionY
     )
 {
-    auto thisPtr = static_cast<MX6DOD_DEVICE*>(ContextPtr);
+    auto thisPtr = static_cast<DEVICE*>(ContextPtr);
 
     const UINT destPitch = thisPtr->dxgkDisplayInfo.Pitch;
     const UINT bytesPerLine = SourceWidth * 4;
@@ -103,13 +100,13 @@ VOID MX6DOD_DEVICE::DdiSystemDisplayWrite (
 }
 
 _Use_decl_annotations_
-NTSTATUS MX6DOD_DEVICE::DdiSetPowerComponentFState (
+NTSTATUS DEVICE::DdiSetPowerComponentFState (
     IN_CONST_HANDLE DriverContextPtr,
     UINT ComponentIndex,
     UINT FState
     )
 {
-    auto thisPtr = static_cast<MX6DOD_DEVICE*>(DriverContextPtr);
+    auto thisPtr = static_cast<DEVICE*>(DriverContextPtr);
 
     LOG_TRACE(
         "Set component FState (ComponentIndex = %u, FState = %u)",
@@ -138,7 +135,7 @@ NTSTATUS MX6DOD_DEVICE::DdiSetPowerComponentFState (
 }
 
 _Use_decl_annotations_
-NTSTATUS MX6DOD_DEVICE::DdiPowerRuntimeControlRequest (
+NTSTATUS DEVICE::DdiPowerRuntimeControlRequest (
     IN_CONST_HANDLE /*DriverContextPtr*/,
     LPCGUID PowerControlCode,
     PVOID /*InBufferPtr*/,
@@ -155,7 +152,8 @@ NTSTATUS MX6DOD_DEVICE::DdiPowerRuntimeControlRequest (
     return STATUS_NOT_SUPPORTED;
 }
 
-void MX6DOD_DEVICE::HdmiPhyOn ()
+#if 0 // brh
+void DEVICE::HdmiPhyOn ()
 {
     LOG_TRACE("Turning on HDMI PHY");
 
@@ -176,7 +174,7 @@ void MX6DOD_DEVICE::HdmiPhyOn ()
     this->writeHdmiRegister(HDMI_MC_PHYRSTZ, 0);
 }
 
-void MX6DOD_DEVICE::HdmiPhyOff ()
+void DEVICE::HdmiPhyOff ()
 {
     LOG_TRACE("Turning off HDMI PHY");
 
@@ -190,53 +188,34 @@ void MX6DOD_DEVICE::HdmiPhyOff ()
 
     this->writeHdmiRegister(HDMI_PHY_CONF0, val);
 }
+#endif
 
-void MX6DOD_DEVICE::IpuOn ()
-{
-    LOG_TRACE("Turning on IPU");
-    ULONG dispGen = this->readIpuRegister(IPU_IPU_DISP_GEN_OFFSET);
-    dispGen |= DI0_COUNTER_RELEASE;
-    this->writeIpuRegister(IPU_IPU_DISP_GEN_OFFSET, dispGen);
-
-    this->writeIpuRegister(IPU_IPU_CONF_OFFSET, this->ipu1Conf);
-}
-
-void MX6DOD_DEVICE::IpuOff ()
-{
-    LOG_TRACE("Turning off IPU");
-    this->writeIpuRegister(IPU_IPU_CONF_OFFSET, 0);
-
-    ULONG dispGen = this->readIpuRegister(IPU_IPU_DISP_GEN_OFFSET);
-    dispGen &= ~DI0_COUNTER_RELEASE;
-    this->writeIpuRegister(IPU_IPU_DISP_GEN_OFFSET, dispGen);
-}
-
-MX6DOD_NONPAGED_SEGMENT_END; //================================================
-MX6DOD_PAGED_SEGMENT_BEGIN; //=================================================
+NONPAGED_SEGMENT_END; //================================================
+PAGED_SEGMENT_BEGIN; //=================================================
 
 _Use_decl_annotations_
-NTSTATUS MX6DOD_DEVICE::DdiAddDevice (
+NTSTATUS DEVICE::DdiAddDevice (
     DEVICE_OBJECT* const PhysicalDeviceObjectPtr,
     VOID** MiniportDeviceContextPPtr
     )
 {
     PAGED_CODE();
-    MX6DOD_ASSERT_MAX_IRQL(PASSIVE_LEVEL);
+    ASSERT_MAX_IRQL(PASSIVE_LEVEL);
 
     // freed below in MX6DodDdiRemoveDevice
     void* contextPtr = ExAllocatePoolWithTag(
             NonPagedPoolNx,
-            sizeof(MX6DOD_DEVICE),
-            MX6DOD_ALLOC_TAG::DEVICE);
+            sizeof(DEVICE),
+            ALLOC_TAG::DEVICE);
 
     if (contextPtr == nullptr) {
         LOG_LOW_MEMORY(
-            "Failed to allocate MX6DOD_DEVICE from nonpaged pool.");
+            "Failed to allocate DEVICE from nonpaged pool.");
 
         return STATUS_NO_MEMORY;
     }
 
-    auto thisPtr = new (contextPtr) MX6DOD_DEVICE(PhysicalDeviceObjectPtr);
+    auto thisPtr = new (contextPtr) DEVICE(PhysicalDeviceObjectPtr);
 
     LOG_TRACE(
         "Successfully allocated device context. "
@@ -249,22 +228,22 @@ NTSTATUS MX6DOD_DEVICE::DdiAddDevice (
 }
 
 _Use_decl_annotations_
-NTSTATUS MX6DOD_DEVICE::DdiRemoveDevice (VOID* const MiniportDeviceContextPtr)
+NTSTATUS DEVICE::DdiRemoveDevice (VOID* const MiniportDeviceContextPtr)
 {
     PAGED_CODE();
-    MX6DOD_ASSERT_MAX_IRQL(PASSIVE_LEVEL);
+    ASSERT_MAX_IRQL(PASSIVE_LEVEL);
 
-    auto thisPtr = reinterpret_cast<MX6DOD_DEVICE*>(MiniportDeviceContextPtr);
-    thisPtr->~MX6DOD_DEVICE();
+    auto thisPtr = reinterpret_cast<DEVICE*>(MiniportDeviceContextPtr);
+    thisPtr->~DEVICE();
 
-    ExFreePoolWithTag(thisPtr, MX6DOD_ALLOC_TAG::DEVICE);
+    ExFreePoolWithTag(thisPtr, ALLOC_TAG::DEVICE);
 
     LOG_TRACE("Successfully deallocated device context.");
     return STATUS_SUCCESS;
 }
 
 _Use_decl_annotations_
-NTSTATUS MX6DOD_DEVICE::DdiStartDevice (
+NTSTATUS DEVICE::DdiStartDevice (
     VOID* const MiniportDeviceContextPtr,
     DXGK_START_INFO* DxgkStartInfoPtr,
     DXGKRNL_INTERFACE* DxgkInterfacePtr,
@@ -273,9 +252,9 @@ NTSTATUS MX6DOD_DEVICE::DdiStartDevice (
     )
 {
     PAGED_CODE();
-    MX6DOD_ASSERT_MAX_IRQL(PASSIVE_LEVEL);
+    ASSERT_MAX_IRQL(PASSIVE_LEVEL);
 
-    auto thisPtr = reinterpret_cast<MX6DOD_DEVICE*>(MiniportDeviceContextPtr);
+    auto thisPtr = reinterpret_cast<DEVICE*>(MiniportDeviceContextPtr);
     thisPtr->dxgkStartInfo = *DxgkStartInfoPtr;
     thisPtr->dxgkInterface = *DxgkInterfacePtr;
 
@@ -294,6 +273,7 @@ NTSTATUS MX6DOD_DEVICE::DdiStartDevice (
     }
 
     // Find and validate hardware resources
+#if 0 // brh
     const CM_PARTIAL_RESOURCE_DESCRIPTOR* ipuMemoryResourcePtr = nullptr;
     const CM_PARTIAL_RESOURCE_DESCRIPTOR* hdmiMemoryResourcePtr = nullptr;
     {
@@ -384,7 +364,7 @@ NTSTATUS MX6DOD_DEVICE::DdiStartDevice (
 
         return status;
     }
-    auto unmapIpuRegisters = MX6DOD_FINALLY::DoUnless([&] {
+    auto unmapIpuRegisters = FINALLY::DoUnless([&] {
         PAGED_CODE();
         NTSTATUS unmapStatus = thisPtr->dxgkInterface.DxgkCbUnmapMemory(
                 thisPtr->dxgkInterface.DeviceHandle,
@@ -415,7 +395,7 @@ NTSTATUS MX6DOD_DEVICE::DdiStartDevice (
 
         return status;
     }
-    auto unmapHdmiRegisters = MX6DOD_FINALLY::DoUnless([&] {
+    auto unmapHdmiRegisters = FINALLY::DoUnless([&] {
         PAGED_CODE();
         NTSTATUS unmapStatus = thisPtr->dxgkInterface.DxgkCbUnmapMemory(
                 thisPtr->dxgkInterface.DeviceHandle,
@@ -424,6 +404,7 @@ NTSTATUS MX6DOD_DEVICE::DdiStartDevice (
         UNREFERENCED_PARAMETER(unmapStatus);
         NT_ASSERT(NT_SUCCESS(unmapStatus));
     });
+#endif // brh
 
     status = thisPtr->dxgkInterface.DxgkCbAcquirePostDisplayOwnership(
             thisPtr->dxgkInterface.DeviceHandle,
@@ -495,23 +476,27 @@ NTSTATUS MX6DOD_DEVICE::DdiStartDevice (
         return STATUS_NO_MEMORY;
     }
 
-    auto unmapBiosFrameBuffer = MX6DOD_FINALLY::DoUnless([&] {
+    auto unmapBiosFrameBuffer = FINALLY::DoUnless([&] {
         PAGED_CODE();
         MmUnmapIoSpace(biosFrameBufferPtr, frameBufferLength);
     });
 
+#if 0 // brh
     unmapIpuRegisters.DoNot();
     thisPtr->ipuRegistersPtr = ipuRegistersPtr;
 
     unmapHdmiRegisters.DoNot();
     thisPtr->hdmiRegistersPtr = hdmiRegistersPtr;
+#endif
 
     thisPtr->frameBufferLength = frameBufferLength;
 
     unmapBiosFrameBuffer.DoNot();
     thisPtr->biosFrameBufferPtr = biosFrameBufferPtr;
 
+#if 0 // brh
     thisPtr->ipu1Conf = thisPtr->readIpuRegister(IPU_IPU_CONF_OFFSET);
+#endif
 
     *NumberOfVideoPresentSourcesPtr = 1;
     *NumberOfChildrenPtr = CHILD_COUNT;     // represents the HDMI connector
@@ -521,12 +506,12 @@ NTSTATUS MX6DOD_DEVICE::DdiStartDevice (
 }
 
 _Use_decl_annotations_
-NTSTATUS MX6DOD_DEVICE::DdiStopDevice (VOID* const MiniportDeviceContextPtr)
+NTSTATUS DEVICE::DdiStopDevice (VOID* const MiniportDeviceContextPtr)
 {
     PAGED_CODE();
-    MX6DOD_ASSERT_MAX_IRQL(PASSIVE_LEVEL);
+    ASSERT_MAX_IRQL(PASSIVE_LEVEL);
 
-    auto thisPtr = reinterpret_cast<MX6DOD_DEVICE*>(MiniportDeviceContextPtr);
+    auto thisPtr = reinterpret_cast<DEVICE*>(MiniportDeviceContextPtr);
 
     // Unmap BIOS frame buffer
     NT_ASSERT(thisPtr->biosFrameBufferPtr);
@@ -537,6 +522,7 @@ NTSTATUS MX6DOD_DEVICE::DdiStopDevice (VOID* const MiniportDeviceContextPtr)
     thisPtr->biosFrameBufferPtr = nullptr;
     thisPtr->frameBufferLength = 0;
 
+#if 0 // brh
     // Unmap IPU register block
     NT_ASSERT(thisPtr->ipuRegistersPtr);
     NTSTATUS unmapStatus = thisPtr->dxgkInterface.DxgkCbUnmapMemory(
@@ -556,20 +542,21 @@ NTSTATUS MX6DOD_DEVICE::DdiStopDevice (VOID* const MiniportDeviceContextPtr)
     UNREFERENCED_PARAMETER(unmapStatus);
     NT_ASSERT(NT_SUCCESS(unmapStatus));
     thisPtr->hdmiRegistersPtr = nullptr;
+#endif
 
     LOG_TRACE("Successfully stopped device.");
     return STATUS_SUCCESS;
 }
 
 _Use_decl_annotations_
-NTSTATUS MX6DOD_DEVICE::DdiDispatchIoRequest (
+NTSTATUS DEVICE::DdiDispatchIoRequest (
     VOID* const /*MiniportDeviceContextPtr*/,
     ULONG /*VidPnSourceId*/,
     VIDEO_REQUEST_PACKET* VideoRequestPacketPtr
     )
 {
     PAGED_CODE();
-    MX6DOD_ASSERT_MAX_IRQL(PASSIVE_LEVEL);
+    ASSERT_MAX_IRQL(PASSIVE_LEVEL);
 
     LOG_WARNING(
         "Custom IO requests are not supported. "
@@ -580,14 +567,14 @@ NTSTATUS MX6DOD_DEVICE::DdiDispatchIoRequest (
 }
 
 _Use_decl_annotations_
-NTSTATUS MX6DOD_DEVICE::DdiQueryChildRelations (
+NTSTATUS DEVICE::DdiQueryChildRelations (
     VOID* const /*MiniportDeviceContextPtr*/,
     DXGK_CHILD_DESCRIPTOR* ChildRelationsPtr,
     ULONG ChildRelationsSizeInBytes
     )
 {
     PAGED_CODE();
-    MX6DOD_ASSERT_MAX_IRQL(PASSIVE_LEVEL);
+    ASSERT_MAX_IRQL(PASSIVE_LEVEL);
 
     // Enumerate the child devices of the adapter. There is a single child
     // to enumerate which is the HDMI connector. The number of children
@@ -626,14 +613,14 @@ NTSTATUS MX6DOD_DEVICE::DdiQueryChildRelations (
 }
 
 _Use_decl_annotations_
-NTSTATUS MX6DOD_DEVICE::DdiQueryChildStatus (
+NTSTATUS DEVICE::DdiQueryChildStatus (
     VOID* const MiniportDeviceContextPtr,
     DXGK_CHILD_STATUS* ChildStatusPtr,
     BOOLEAN NonDestructiveOnly
     )
 {
     PAGED_CODE();
-    MX6DOD_ASSERT_MAX_IRQL(PASSIVE_LEVEL);
+    ASSERT_MAX_IRQL(PASSIVE_LEVEL);
 
     NT_ASSERT(ChildStatusPtr->ChildUid == 0);
 
@@ -676,14 +663,14 @@ NTSTATUS MX6DOD_DEVICE::DdiQueryChildStatus (
 }
 
 _Use_decl_annotations_
-NTSTATUS MX6DOD_DEVICE::DdiQueryDeviceDescriptor (
+NTSTATUS DEVICE::DdiQueryDeviceDescriptor (
     VOID* const /*MiniportDeviceContextPtr*/,
     ULONG ChildUid,
     DXGK_DEVICE_DESCRIPTOR* /*DeviceDescriptorPtr*/
     )
 {
     PAGED_CODE();
-    MX6DOD_ASSERT_MAX_IRQL(PASSIVE_LEVEL);
+    ASSERT_MAX_IRQL(PASSIVE_LEVEL);
 
     UNREFERENCED_PARAMETER(ChildUid);
     NT_ASSERT(ChildUid == 0);
@@ -694,7 +681,7 @@ NTSTATUS MX6DOD_DEVICE::DdiQueryDeviceDescriptor (
 }
 
 _Use_decl_annotations_
-NTSTATUS MX6DOD_DEVICE::DdiSetPowerState (
+NTSTATUS DEVICE::DdiSetPowerState (
     VOID* const /*MiniportDeviceContextPtr*/,
     ULONG DeviceUid,
     DEVICE_POWER_STATE DevicePowerState,
@@ -702,7 +689,7 @@ NTSTATUS MX6DOD_DEVICE::DdiSetPowerState (
     )
 {
     PAGED_CODE();
-    MX6DOD_ASSERT_MAX_IRQL(PASSIVE_LEVEL);
+    ASSERT_MAX_IRQL(PASSIVE_LEVEL);
 
     //
     // Power management is handled at the component level
@@ -719,13 +706,13 @@ NTSTATUS MX6DOD_DEVICE::DdiSetPowerState (
 }
 
 _Use_decl_annotations_
-NTSTATUS MX6DOD_DEVICE::DdiQueryAdapterInfo (
+NTSTATUS DEVICE::DdiQueryAdapterInfo (
     VOID* const MiniportDeviceContextPtr,
     const DXGKARG_QUERYADAPTERINFO* QueryAdapterInfoPtr
     )
 {
     PAGED_CODE();
-    MX6DOD_ASSERT_MAX_IRQL(PASSIVE_LEVEL);
+    ASSERT_MAX_IRQL(PASSIVE_LEVEL);
 
     switch (QueryAdapterInfoPtr->Type) {
     case DXGKQAITYPE_DRIVERCAPS: // DXGK_DRIVERCAPS
@@ -1033,13 +1020,13 @@ NTSTATUS MX6DOD_DEVICE::DdiQueryAdapterInfo (
 // set the pointer to not visible
 //
 _Use_decl_annotations_
-NTSTATUS MX6DOD_DEVICE::DdiSetPointerPosition (
+NTSTATUS DEVICE::DdiSetPointerPosition (
     VOID* const /*MiniportDeviceContextPtr*/,
     const DXGKARG_SETPOINTERPOSITION* SetPointerPositionPtr
     )
 {
     PAGED_CODE();
-    MX6DOD_ASSERT_MAX_IRQL(PASSIVE_LEVEL);
+    ASSERT_MAX_IRQL(PASSIVE_LEVEL);
 
     NT_ASSERT(SetPointerPositionPtr->VidPnSourceId == 0);
     if (!SetPointerPositionPtr->Flags.Visible) {
@@ -1055,13 +1042,13 @@ NTSTATUS MX6DOD_DEVICE::DdiSetPointerPosition (
 }
 
 _Use_decl_annotations_
-NTSTATUS MX6DOD_DEVICE::DdiSetPointerShape (
+NTSTATUS DEVICE::DdiSetPointerShape (
     VOID* const /*MiniportDeviceContextPtr*/,
     const DXGKARG_SETPOINTERSHAPE* SetPointerShapePtr
     )
 {
     PAGED_CODE();
-    MX6DOD_ASSERT_MAX_IRQL(PASSIVE_LEVEL);
+    ASSERT_MAX_IRQL(PASSIVE_LEVEL);
 
     UNREFERENCED_PARAMETER(SetPointerShapePtr);
     NT_ASSERT(SetPointerShapePtr->VidPnSourceId == 0);
@@ -1074,13 +1061,13 @@ NTSTATUS MX6DOD_DEVICE::DdiSetPointerShape (
 }
 
 _Use_decl_annotations_
-NTSTATUS MX6DOD_DEVICE::DdiIsSupportedVidPn (
+NTSTATUS DEVICE::DdiIsSupportedVidPn (
     VOID* const MiniportDeviceContextPtr,
     DXGKARG_ISSUPPORTEDVIDPN* IsSupportedVidPnPtr
     )
 {
     PAGED_CODE();
-    MX6DOD_ASSERT_MAX_IRQL(PASSIVE_LEVEL);
+    ASSERT_MAX_IRQL(PASSIVE_LEVEL);
 
     IsSupportedVidPnPtr->IsVidPnSupported = FALSE;
 
@@ -1090,7 +1077,7 @@ NTSTATUS MX6DOD_DEVICE::DdiIsSupportedVidPn (
         return STATUS_SUCCESS;
     }
 
-    auto thisPtr = reinterpret_cast<MX6DOD_DEVICE*>(MiniportDeviceContextPtr);
+    auto thisPtr = reinterpret_cast<DEVICE*>(MiniportDeviceContextPtr);
 
     // Verify that there is exactly one path and source and target IDs are both 0
     const DXGK_VIDPN_INTERFACE* vidPnInterfacePtr;
@@ -1174,7 +1161,7 @@ NTSTATUS MX6DOD_DEVICE::DdiIsSupportedVidPn (
         return status;
     }
     NT_ASSERT(presentPathPtr);
-    auto releasePathInfo = MX6DOD_FINALLY::Do([&, presentPathPtr] () {
+    auto releasePathInfo = FINALLY::Do([&, presentPathPtr] () {
         PAGED_CODE();
         NTSTATUS releaseStatus = topologyInterfacePtr->pfnReleasePathInfo(
                 vidPnTopologyHandle,
@@ -1209,28 +1196,28 @@ NTSTATUS MX6DOD_DEVICE::DdiIsSupportedVidPn (
 }
 
 _Use_decl_annotations_
-NTSTATUS MX6DOD_DEVICE::DdiRecommendFunctionalVidPn (
+NTSTATUS DEVICE::DdiRecommendFunctionalVidPn (
     VOID* const /*MiniportDeviceContextPtr*/,
     const DXGKARG_RECOMMENDFUNCTIONALVIDPN* const /*RecommendFunctionalVidPnPtr*/
     )
 {
     PAGED_CODE();
-    MX6DOD_ASSERT_MAX_IRQL(PASSIVE_LEVEL);
+    ASSERT_MAX_IRQL(PASSIVE_LEVEL);
 
     LOG_ERROR("Not implemented");
     return STATUS_NOT_IMPLEMENTED;
 }
 
 _Use_decl_annotations_
-NTSTATUS MX6DOD_DEVICE::DdiEnumVidPnCofuncModality (
+NTSTATUS DEVICE::DdiEnumVidPnCofuncModality (
     VOID* const MiniportDeviceContextPtr,
     const DXGKARG_ENUMVIDPNCOFUNCMODALITY* const EnumCofuncModalityPtr
     )
 {
     PAGED_CODE();
-    MX6DOD_ASSERT_MAX_IRQL(PASSIVE_LEVEL);
+    ASSERT_MAX_IRQL(PASSIVE_LEVEL);
 
-    auto thisPtr = reinterpret_cast<MX6DOD_DEVICE*>(MiniportDeviceContextPtr);
+    auto thisPtr = reinterpret_cast<DEVICE*>(MiniportDeviceContextPtr);
 
     // get the vidPn interface
     const DXGK_VIDPN_INTERFACE* vidPnInterfacePtr;
@@ -1292,7 +1279,7 @@ NTSTATUS MX6DOD_DEVICE::DdiEnumVidPnCofuncModality (
 
     while (status == STATUS_SUCCESS) {
         NT_ASSERT(presentPathPtr);
-        auto releasePathInfo = MX6DOD_FINALLY::Do([&, presentPathPtr] () {
+        auto releasePathInfo = FINALLY::Do([&, presentPathPtr] () {
             PAGED_CODE();
             NTSTATUS releaseStatus = topologyInterfacePtr->pfnReleasePathInfo(
                     vidPnTopologyHandle,
@@ -1480,13 +1467,13 @@ NTSTATUS MX6DOD_DEVICE::DdiEnumVidPnCofuncModality (
 }
 
 _Use_decl_annotations_
-NTSTATUS MX6DOD_DEVICE::DdiSetVidPnSourceVisibility (
+NTSTATUS DEVICE::DdiSetVidPnSourceVisibility (
     VOID* const /*MiniportDeviceContextPtr*/,
     const DXGKARG_SETVIDPNSOURCEVISIBILITY* SetVidPnSourceVisibilityPtr
     )
 {
     PAGED_CODE();
-    MX6DOD_ASSERT_MAX_IRQL(PASSIVE_LEVEL);
+    ASSERT_MAX_IRQL(PASSIVE_LEVEL);
 
     LOG_TRACE(
         "Received request to set visibility. (VidPnSourceId = %d, Visible = %d)",
@@ -1497,13 +1484,13 @@ NTSTATUS MX6DOD_DEVICE::DdiSetVidPnSourceVisibility (
 }
 
 _Use_decl_annotations_
-NTSTATUS MX6DOD_DEVICE::DdiCommitVidPn (
+NTSTATUS DEVICE::DdiCommitVidPn (
     VOID* const MiniportDeviceContextPtr,
     const DXGKARG_COMMITVIDPN* const CommitVidPnPtr
     )
 {
     PAGED_CODE();
-    MX6DOD_ASSERT_MAX_IRQL(PASSIVE_LEVEL);
+    ASSERT_MAX_IRQL(PASSIVE_LEVEL);
 
     LOG_TRACE(
         "DdiCommitVidPn() was called. "
@@ -1517,7 +1504,7 @@ NTSTATUS MX6DOD_DEVICE::DdiCommitVidPn (
         CommitVidPnPtr->Flags.PathPowerTransition,
         CommitVidPnPtr->Flags.PathPoweredOff);
 
-    auto thisPtr = reinterpret_cast<MX6DOD_DEVICE*>(MiniportDeviceContextPtr);
+    auto thisPtr = reinterpret_cast<DEVICE*>(MiniportDeviceContextPtr);
 
     // get the vidPn interface
     const DXGK_VIDPN_INTERFACE* vidPnInterfacePtr;
@@ -1596,7 +1583,7 @@ NTSTATUS MX6DOD_DEVICE::DdiCommitVidPn (
     }
 
     NT_ASSERT(sourceModeSetHandle);
-    auto releaseSms = MX6DOD_FINALLY::Do([&] () {
+    auto releaseSms = FINALLY::Do([&] () {
         PAGED_CODE();
         NTSTATUS releaseStatus = vidPnInterfacePtr->pfnReleaseSourceModeSet(
                 CommitVidPnPtr->hFunctionalVidPn,
@@ -1629,7 +1616,7 @@ NTSTATUS MX6DOD_DEVICE::DdiCommitVidPn (
         return STATUS_SUCCESS;
     }
 
-    auto releaseModeInfo = MX6DOD_FINALLY::Do([&] () {
+    auto releaseModeInfo = FINALLY::Do([&] () {
         PAGED_CODE();
         NTSTATUS releaseStatus = smsInterfacePtr->pfnReleaseModeInfo(
                 sourceModeSetHandle,
@@ -1714,7 +1701,7 @@ NTSTATUS MX6DOD_DEVICE::DdiCommitVidPn (
 
             return status;
         }
-        auto releasePathInfo = MX6DOD_FINALLY::Do([&] {
+        auto releasePathInfo = FINALLY::Do([&] {
             PAGED_CODE();
             NTSTATUS releaseStatus = topologyInterfacePtr->pfnReleasePathInfo(
                     vidPnTopologyHandle,
@@ -1750,28 +1737,28 @@ NTSTATUS MX6DOD_DEVICE::DdiCommitVidPn (
 }
 
 _Use_decl_annotations_
-NTSTATUS MX6DOD_DEVICE::DdiUpdateActiveVidPnPresentPath (
+NTSTATUS DEVICE::DdiUpdateActiveVidPnPresentPath (
     VOID* const /*MiniportDeviceContextPtr*/,
     const DXGKARG_UPDATEACTIVEVIDPNPRESENTPATH* const /*ArgsPtr*/
     )
 {
     PAGED_CODE();
-    MX6DOD_ASSERT_MAX_IRQL(PASSIVE_LEVEL);
+    ASSERT_MAX_IRQL(PASSIVE_LEVEL);
 
     LOG_ERROR("Not implemented");
     return STATUS_NOT_IMPLEMENTED;
 }
 
 _Use_decl_annotations_
-NTSTATUS MX6DOD_DEVICE::DdiRecommendMonitorModes (
+NTSTATUS DEVICE::DdiRecommendMonitorModes (
     VOID* const MiniportDeviceContextPtr,
     const DXGKARG_RECOMMENDMONITORMODES* const RecommendMonitorModesPtr
     )
 {
     PAGED_CODE();
-    MX6DOD_ASSERT_MAX_IRQL(PASSIVE_LEVEL);
+    ASSERT_MAX_IRQL(PASSIVE_LEVEL);
 
-    auto thisPtr = reinterpret_cast<MX6DOD_DEVICE*>(MiniportDeviceContextPtr);
+    auto thisPtr = reinterpret_cast<DEVICE*>(MiniportDeviceContextPtr);
     NT_ASSERT(RecommendMonitorModesPtr->VideoPresentTargetId == 0);
 
     const auto& tbl = *RecommendMonitorModesPtr->pMonitorSourceModeSetInterface;
@@ -1788,7 +1775,7 @@ NTSTATUS MX6DOD_DEVICE::DdiRecommendMonitorModes (
 
         return status;
     }
-    auto releaseMonitorMode = MX6DOD_FINALLY::DoUnless([&] () {
+    auto releaseMonitorMode = FINALLY::DoUnless([&] () {
         PAGED_CODE();
         NTSTATUS releaseStatus = tbl.pfnReleaseModeInfo(
                 RecommendMonitorModesPtr->hMonitorSourceModeSet,
@@ -1840,13 +1827,13 @@ NTSTATUS MX6DOD_DEVICE::DdiRecommendMonitorModes (
 }
 
 _Use_decl_annotations_
-NTSTATUS MX6DOD_DEVICE::DdiQueryVidPnHWCapability (
+NTSTATUS DEVICE::DdiQueryVidPnHWCapability (
     VOID* const /*MiniportDeviceContextPtr*/,
     DXGKARG_QUERYVIDPNHWCAPABILITY* VidPnHWCapsPtr
     )
 {
     PAGED_CODE();
-    MX6DOD_ASSERT_MAX_IRQL(PASSIVE_LEVEL);
+    ASSERT_MAX_IRQL(PASSIVE_LEVEL);
 
     LOG_TRACE(
         "DdiQueryVidPnHWCapability() was called. (hFunctionalVidPn = %p, "
@@ -1870,15 +1857,15 @@ NTSTATUS MX6DOD_DEVICE::DdiQueryVidPnHWCapability (
 }
 
 _Use_decl_annotations_
-NTSTATUS MX6DOD_DEVICE::DdiPresentDisplayOnly (
+NTSTATUS DEVICE::DdiPresentDisplayOnly (
     VOID* const MiniportDeviceContextPtr,
     const DXGKARG_PRESENT_DISPLAYONLY* PresentDisplayOnlyPtr
     )
 {
     PAGED_CODE();
-    MX6DOD_ASSERT_MAX_IRQL(PASSIVE_LEVEL);
+    ASSERT_MAX_IRQL(PASSIVE_LEVEL);
 
-    auto thisPtr = reinterpret_cast<MX6DOD_DEVICE*>(MiniportDeviceContextPtr);
+    auto thisPtr = reinterpret_cast<DEVICE*>(MiniportDeviceContextPtr);
 
     LOG_TRACE(
         "Received present call. (VidPnSourceId = %d, BytesPerPixel = %d, "
@@ -1915,14 +1902,14 @@ NTSTATUS MX6DOD_DEVICE::DdiPresentDisplayOnly (
 }
 
 _Use_decl_annotations_
-NTSTATUS MX6DOD_DEVICE::DdiStopDeviceAndReleasePostDisplayOwnership (
+NTSTATUS DEVICE::DdiStopDeviceAndReleasePostDisplayOwnership (
     VOID* const /*MiniportDeviceContextPtr*/,
     D3DDDI_VIDEO_PRESENT_TARGET_ID /*TargetId*/,
     DXGK_DISPLAY_INFORMATION* /*DisplayInfoPtr*/
     )
 {
     PAGED_CODE();
-    MX6DOD_ASSERT_MAX_IRQL(PASSIVE_LEVEL);
+    ASSERT_MAX_IRQL(PASSIVE_LEVEL);
 
     LOG_ERROR("Not implemented");
     return STATUS_NOT_IMPLEMENTED;
@@ -1933,14 +1920,14 @@ NTSTATUS MX6DOD_DEVICE::DdiStopDeviceAndReleasePostDisplayOwnership (
 // if the source does not have a pinned mode.
 //
 _Use_decl_annotations_
-NTSTATUS MX6DOD_DEVICE::SourceHasPinnedMode (
+NTSTATUS DEVICE::SourceHasPinnedMode (
     D3DKMDT_HVIDPN VidPnHandle,
     const DXGK_VIDPN_INTERFACE* VidPnInterfacePtr,
     D3DKMDT_VIDEO_PRESENT_SOURCE_MODE_ID SourceId
     )
 {
     PAGED_CODE();
-    MX6DOD_ASSERT_MAX_IRQL(PASSIVE_LEVEL);
+    ASSERT_MAX_IRQL(PASSIVE_LEVEL);
 
     // Get the source mode set for this SourceId
     D3DKMDT_HVIDPNSOURCEMODESET sourceModeSetHandle;
@@ -1960,7 +1947,7 @@ NTSTATUS MX6DOD_DEVICE::SourceHasPinnedMode (
         return status;
     }
     NT_ASSERT(sourceModeSetHandle);
-    auto releaseSms = MX6DOD_FINALLY::Do([&] () {
+    auto releaseSms = FINALLY::Do([&] () {
         PAGED_CODE();
         NTSTATUS releaseStatus = VidPnInterfacePtr->pfnReleaseSourceModeSet(
                 VidPnHandle,
@@ -1991,7 +1978,7 @@ NTSTATUS MX6DOD_DEVICE::SourceHasPinnedMode (
         return STATUS_NOT_FOUND;
     }
 
-    auto releaseModeInfo = MX6DOD_FINALLY::Do([&] () {
+    auto releaseModeInfo = FINALLY::Do([&] () {
         PAGED_CODE();
         NTSTATUS releaseStatus = smsInterfacePtr->pfnReleaseModeInfo(
                 sourceModeSetHandle,
@@ -2009,7 +1996,7 @@ NTSTATUS MX6DOD_DEVICE::SourceHasPinnedMode (
 // connected monitor
 //
 _Use_decl_annotations_
-NTSTATUS MX6DOD_DEVICE::CreateAndAssignSourceModeSet (
+NTSTATUS DEVICE::CreateAndAssignSourceModeSet (
     D3DKMDT_HVIDPN VidPnHandle,
     const DXGK_VIDPN_INTERFACE* VidPnInterfacePtr,
     D3DKMDT_VIDEO_PRESENT_SOURCE_MODE_ID SourceId,
@@ -2017,7 +2004,7 @@ NTSTATUS MX6DOD_DEVICE::CreateAndAssignSourceModeSet (
     ) const
 {
     PAGED_CODE();
-    MX6DOD_ASSERT_MAX_IRQL(PASSIVE_LEVEL);
+    ASSERT_MAX_IRQL(PASSIVE_LEVEL);
 
     // Create a new source mode set which will be added to the constraining
     // VidPn with all the possible modes
@@ -2038,7 +2025,7 @@ NTSTATUS MX6DOD_DEVICE::CreateAndAssignSourceModeSet (
         return status;
     }
     NT_ASSERT(sourceModeSetHandle);
-    auto releaseSms = MX6DOD_FINALLY::DoUnless([&] () {
+    auto releaseSms = FINALLY::DoUnless([&] () {
         PAGED_CODE();
         NTSTATUS releaseStatus = VidPnInterfacePtr->pfnReleaseSourceModeSet(
                 VidPnHandle,
@@ -2064,7 +2051,7 @@ NTSTATUS MX6DOD_DEVICE::CreateAndAssignSourceModeSet (
             return status;
         }
         NT_ASSERT(sourceModeInfoPtr);
-        auto releaseModeInfo = MX6DOD_FINALLY::DoUnless([&] () {
+        auto releaseModeInfo = FINALLY::DoUnless([&] () {
             PAGED_CODE();
             NTSTATUS releaseStatus = smsInterfacePtr->pfnReleaseModeInfo(
                     sourceModeSetHandle,
@@ -2144,14 +2131,14 @@ NTSTATUS MX6DOD_DEVICE::CreateAndAssignSourceModeSet (
 // if the target does not have a pinned mode.
 //
 _Use_decl_annotations_
-NTSTATUS MX6DOD_DEVICE::TargetHasPinnedMode (
+NTSTATUS DEVICE::TargetHasPinnedMode (
     D3DKMDT_HVIDPN VidPnHandle,
     const DXGK_VIDPN_INTERFACE* VidPnInterfacePtr,
     D3DKMDT_VIDEO_PRESENT_TARGET_MODE_ID TargetId
     )
 {
     PAGED_CODE();
-    MX6DOD_ASSERT_MAX_IRQL(PASSIVE_LEVEL);
+    ASSERT_MAX_IRQL(PASSIVE_LEVEL);
 
     // Get the source mode set for this SourceId
     D3DKMDT_HVIDPNTARGETMODESET targetModeSetHandle;
@@ -2171,7 +2158,7 @@ NTSTATUS MX6DOD_DEVICE::TargetHasPinnedMode (
         return status;
     }
     NT_ASSERT(targetModeSetHandle);
-    auto releaseTargetModeSet = MX6DOD_FINALLY::Do([&] () {
+    auto releaseTargetModeSet = FINALLY::Do([&] () {
         PAGED_CODE();
         NTSTATUS releaseStatus = VidPnInterfacePtr->pfnReleaseTargetModeSet(
                 VidPnHandle,
@@ -2202,7 +2189,7 @@ NTSTATUS MX6DOD_DEVICE::TargetHasPinnedMode (
         return STATUS_NOT_FOUND;
     }
 
-    auto releaseModeInfo = MX6DOD_FINALLY::Do([&] () {
+    auto releaseModeInfo = FINALLY::Do([&] () {
         PAGED_CODE();
         NTSTATUS releaseStatus = tmsInterfacePtr->pfnReleaseModeInfo(
                 targetModeSetHandle,
@@ -2220,7 +2207,7 @@ NTSTATUS MX6DOD_DEVICE::TargetHasPinnedMode (
 // connected monitor.
 //
 _Use_decl_annotations_
-NTSTATUS MX6DOD_DEVICE::CreateAndAssignTargetModeSet (
+NTSTATUS DEVICE::CreateAndAssignTargetModeSet (
     D3DKMDT_HVIDPN VidPnHandle,
     const DXGK_VIDPN_INTERFACE* VidPnInterfacePtr,
     D3DKMDT_VIDEO_PRESENT_SOURCE_MODE_ID /*SourceId*/,
@@ -2228,7 +2215,7 @@ NTSTATUS MX6DOD_DEVICE::CreateAndAssignTargetModeSet (
     ) const
 {
     PAGED_CODE();
-    MX6DOD_ASSERT_MAX_IRQL(PASSIVE_LEVEL);
+    ASSERT_MAX_IRQL(PASSIVE_LEVEL);
 
     D3DKMDT_HVIDPNTARGETMODESET targetModeSetHandle;
     const DXGK_VIDPNTARGETMODESET_INTERFACE* tmsInterfacePtr;
@@ -2247,7 +2234,7 @@ NTSTATUS MX6DOD_DEVICE::CreateAndAssignTargetModeSet (
         return status;
     }
     NT_ASSERT(targetModeSetHandle);
-    auto releaseSms = MX6DOD_FINALLY::DoUnless([&] () {
+    auto releaseSms = FINALLY::DoUnless([&] () {
         PAGED_CODE();
         NTSTATUS releaseStatus = VidPnInterfacePtr->pfnReleaseTargetModeSet(
                 VidPnHandle,
@@ -2273,7 +2260,7 @@ NTSTATUS MX6DOD_DEVICE::CreateAndAssignTargetModeSet (
             return status;
         }
         NT_ASSERT(targetModeInfoPtr);
-        auto releaseModeInfo = MX6DOD_FINALLY::DoUnless([&] () {
+        auto releaseModeInfo = FINALLY::DoUnless([&] () {
             PAGED_CODE();
             NTSTATUS releaseStatus = tmsInterfacePtr->pfnReleaseModeInfo(
                     targetModeSetHandle,
@@ -2325,12 +2312,12 @@ NTSTATUS MX6DOD_DEVICE::CreateAndAssignTargetModeSet (
 }
 
 _Use_decl_annotations_
-NTSTATUS MX6DOD_DEVICE::IsVidPnSourceModeFieldsValid (
+NTSTATUS DEVICE::IsVidPnSourceModeFieldsValid (
     const D3DKMDT_VIDPN_SOURCE_MODE* SourceModePtr
     )
 {
     PAGED_CODE();
-    MX6DOD_ASSERT_MAX_IRQL(PASSIVE_LEVEL);
+    ASSERT_MAX_IRQL(PASSIVE_LEVEL);
 
     if (SourceModePtr->Type != D3DKMDT_RMT_GRAPHICS) {
         LOG_ERROR(
@@ -2378,12 +2365,12 @@ NTSTATUS MX6DOD_DEVICE::IsVidPnSourceModeFieldsValid (
 }
 
 _Use_decl_annotations_
-NTSTATUS MX6DOD_DEVICE::IsVidPnPathFieldsValid (
+NTSTATUS DEVICE::IsVidPnPathFieldsValid (
     const D3DKMDT_VIDPN_PRESENT_PATH* PathPtr
     )
 {
     PAGED_CODE();
-    MX6DOD_ASSERT_MAX_IRQL(PASSIVE_LEVEL);
+    ASSERT_MAX_IRQL(PASSIVE_LEVEL);
 
     if (PathPtr->VidPnSourceId != 0) {
         LOG_ERROR(
@@ -2447,4 +2434,4 @@ NTSTATUS MX6DOD_DEVICE::IsVidPnPathFieldsValid (
     return STATUS_SUCCESS;
 }
 
-MX6DOD_PAGED_SEGMENT_END; //===================================================
+PAGED_SEGMENT_END; //===================================================

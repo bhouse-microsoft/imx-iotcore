@@ -4,12 +4,11 @@
 #include "precomp.h"
 
 #include "imx8mdod_logging.h"
-
 #include "imx8mdod_common.h"
 #include "imx8mdod_device.h"
 #include "imx8mdod_driver.h"
 
-MX6DOD_NONPAGED_SEGMENT_BEGIN; //==============================================
+NONPAGED_SEGMENT_BEGIN; //==============================================
 
 //
 // Placement new and delete operators
@@ -33,8 +32,8 @@ void* operator new[] ( size_t, void* Ptr ) throw ()
 void operator delete[] ( void*, void* ) throw ()
 {}
 
-MX6DOD_NONPAGED_SEGMENT_END; //================================================
-MX6DOD_PAGED_SEGMENT_BEGIN; //=================================================
+NONPAGED_SEGMENT_END; //================================================
+PAGED_SEGMENT_BEGIN; //=================================================
 
 namespace { // static
 
@@ -48,14 +47,14 @@ _Use_decl_annotations_
 void MX6DodDdiUnload ()
 {
     PAGED_CODE();
-    MX6DOD_ASSERT_MAX_IRQL(PASSIVE_LEVEL);
+    ASSERT_MAX_IRQL(PASSIVE_LEVEL);
 
     NT_ASSERT(mx6GlobalDriverObjectPtr);
     mx6GlobalDriverObjectPtr = nullptr;
 }
 
-MX6DOD_PAGED_SEGMENT_END; //=====================================================
-MX6DOD_INIT_SEGMENT_BEGIN; //====================================================
+PAGED_SEGMENT_END; //=====================================================
+INIT_SEGMENT_BEGIN; //====================================================
 
 _Use_decl_annotations_
 NTSTATUS
@@ -77,37 +76,37 @@ DriverEntry (
 
     dodInit.DxgkDdiUnload = MX6DodDdiUnload;
 
-    dodInit.DxgkDdiAddDevice = MX6DOD_DEVICE::DdiAddDevice;
-    dodInit.DxgkDdiStartDevice = MX6DOD_DEVICE::DdiStartDevice;
-    dodInit.DxgkDdiStopDevice = MX6DOD_DEVICE::DdiStopDevice;
-    dodInit.DxgkDdiResetDevice = MX6DOD_DEVICE::DdiResetDevice;
-    dodInit.DxgkDdiRemoveDevice = MX6DOD_DEVICE::DdiRemoveDevice;
-    dodInit.DxgkDdiDispatchIoRequest = MX6DOD_DEVICE::DdiDispatchIoRequest;
+    dodInit.DxgkDdiAddDevice = DEVICE::DdiAddDevice;
+    dodInit.DxgkDdiStartDevice = DEVICE::DdiStartDevice;
+    dodInit.DxgkDdiStopDevice = DEVICE::DdiStopDevice;
+    dodInit.DxgkDdiResetDevice = DEVICE::DdiResetDevice;
+    dodInit.DxgkDdiRemoveDevice = DEVICE::DdiRemoveDevice;
+    dodInit.DxgkDdiDispatchIoRequest = DEVICE::DdiDispatchIoRequest;
 
-    dodInit.DxgkDdiQueryChildRelations = MX6DOD_DEVICE::DdiQueryChildRelations;
-    dodInit.DxgkDdiQueryChildStatus = MX6DOD_DEVICE::DdiQueryChildStatus;
-    dodInit.DxgkDdiQueryDeviceDescriptor = MX6DOD_DEVICE::DdiQueryDeviceDescriptor;
-    dodInit.DxgkDdiSetPowerState = MX6DOD_DEVICE::DdiSetPowerState;
+    dodInit.DxgkDdiQueryChildRelations = DEVICE::DdiQueryChildRelations;
+    dodInit.DxgkDdiQueryChildStatus = DEVICE::DdiQueryChildStatus;
+    dodInit.DxgkDdiQueryDeviceDescriptor = DEVICE::DdiQueryDeviceDescriptor;
+    dodInit.DxgkDdiSetPowerState = DEVICE::DdiSetPowerState;
 
-    dodInit.DxgkDdiQueryAdapterInfo = MX6DOD_DEVICE::DdiQueryAdapterInfo;
-    dodInit.DxgkDdiSetPointerPosition = MX6DOD_DEVICE::DdiSetPointerPosition;
-    dodInit.DxgkDdiSetPointerShape = MX6DOD_DEVICE::DdiSetPointerShape;
+    dodInit.DxgkDdiQueryAdapterInfo = DEVICE::DdiQueryAdapterInfo;
+    dodInit.DxgkDdiSetPointerPosition = DEVICE::DdiSetPointerPosition;
+    dodInit.DxgkDdiSetPointerShape = DEVICE::DdiSetPointerShape;
 
-    dodInit.DxgkDdiIsSupportedVidPn = MX6DOD_DEVICE::DdiIsSupportedVidPn;
-    dodInit.DxgkDdiRecommendFunctionalVidPn = MX6DOD_DEVICE::DdiRecommendFunctionalVidPn;
-    dodInit.DxgkDdiEnumVidPnCofuncModality = MX6DOD_DEVICE::DdiEnumVidPnCofuncModality;
-    dodInit.DxgkDdiSetVidPnSourceVisibility = MX6DOD_DEVICE::DdiSetVidPnSourceVisibility;
-    dodInit.DxgkDdiCommitVidPn = MX6DOD_DEVICE::DdiCommitVidPn;
-    dodInit.DxgkDdiUpdateActiveVidPnPresentPath = MX6DOD_DEVICE::DdiUpdateActiveVidPnPresentPath;
+    dodInit.DxgkDdiIsSupportedVidPn = DEVICE::DdiIsSupportedVidPn;
+    dodInit.DxgkDdiRecommendFunctionalVidPn = DEVICE::DdiRecommendFunctionalVidPn;
+    dodInit.DxgkDdiEnumVidPnCofuncModality = DEVICE::DdiEnumVidPnCofuncModality;
+    dodInit.DxgkDdiSetVidPnSourceVisibility = DEVICE::DdiSetVidPnSourceVisibility;
+    dodInit.DxgkDdiCommitVidPn = DEVICE::DdiCommitVidPn;
+    dodInit.DxgkDdiUpdateActiveVidPnPresentPath = DEVICE::DdiUpdateActiveVidPnPresentPath;
 
-    dodInit.DxgkDdiRecommendMonitorModes = MX6DOD_DEVICE::DdiRecommendMonitorModes;
-    dodInit.DxgkDdiQueryVidPnHWCapability = MX6DOD_DEVICE::DdiQueryVidPnHWCapability;
-    dodInit.DxgkDdiPresentDisplayOnly = MX6DOD_DEVICE::DdiPresentDisplayOnly;
-    dodInit.DxgkDdiSetPowerComponentFState = MX6DOD_DEVICE::DdiSetPowerComponentFState;
-    dodInit.DxgkDdiStopDeviceAndReleasePostDisplayOwnership = MX6DOD_DEVICE::DdiStopDeviceAndReleasePostDisplayOwnership;
-    dodInit.DxgkDdiSystemDisplayEnable = MX6DOD_DEVICE::DdiSystemDisplayEnable;
-    dodInit.DxgkDdiSystemDisplayWrite = MX6DOD_DEVICE::DdiSystemDisplayWrite;
-    dodInit.DxgkDdiPowerRuntimeControlRequest = MX6DOD_DEVICE::DdiPowerRuntimeControlRequest;
+    dodInit.DxgkDdiRecommendMonitorModes = DEVICE::DdiRecommendMonitorModes;
+    dodInit.DxgkDdiQueryVidPnHWCapability = DEVICE::DdiQueryVidPnHWCapability;
+    dodInit.DxgkDdiPresentDisplayOnly = DEVICE::DdiPresentDisplayOnly;
+    dodInit.DxgkDdiSetPowerComponentFState = DEVICE::DdiSetPowerComponentFState;
+    dodInit.DxgkDdiStopDeviceAndReleasePostDisplayOwnership = DEVICE::DdiStopDeviceAndReleasePostDisplayOwnership;
+    dodInit.DxgkDdiSystemDisplayEnable = DEVICE::DdiSystemDisplayEnable;
+    dodInit.DxgkDdiSystemDisplayWrite = DEVICE::DdiSystemDisplayWrite;
+    dodInit.DxgkDdiPowerRuntimeControlRequest = DEVICE::DdiPowerRuntimeControlRequest;
 
     NTSTATUS status = DxgkInitializeDisplayOnlyDriver(
             DriverObjectPtr,
@@ -129,5 +128,5 @@ DriverEntry (
     return status;
 } // DriverEntry (...)
 
-MX6DOD_INIT_SEGMENT_END; //====================================================
+INIT_SEGMENT_END; //====================================================
 

@@ -1,8 +1,6 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License.
-
-#ifndef _MX6DOD_LOGGING_H_
-#define _MX6DOD_LOGGING_H_ 1
+#pragma once
 
 #ifdef __cplusplus
 extern "C" {
@@ -30,6 +28,3 @@ void Log(int level, const char * prefix, const char * msg, ...);
 #ifdef __cplusplus
 } // extern "C"
 #endif // __cplusplus
-
-#endif // _MX6DOD_LOGGING_H_
-

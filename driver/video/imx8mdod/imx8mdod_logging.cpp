@@ -11,7 +11,7 @@
 
 #include <stdarg.h>
 
-MX6DOD_NONPAGED_SEGMENT_BEGIN; //==============================================
+NONPAGED_SEGMENT_BEGIN; //==============================================
 
 void Log(int level, const char * prefix, const char * msg, ...)
 {
@@ -21,5 +21,4 @@ void Log(int level, const char * prefix, const char * msg, ...)
     va_end(argp);
 }
 
-
-MX6DOD_NONPAGED_SEGMENT_END; //================================================
+NONPAGED_SEGMENT_END; //================================================
