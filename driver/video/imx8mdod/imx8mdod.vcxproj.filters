@@ -38,9 +38,6 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Ipu.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="imx8mdod_common.h">
       <Filter>Header Files</Filter>
     </ClInclude>

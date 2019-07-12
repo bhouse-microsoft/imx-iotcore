@@ -29,7 +29,7 @@ ServiceBinary  = %13%\MyTestDriver.sys
 
 
 ## Adding a Driver to the FFU
-1) After adding your driver to the project and building it, confirm that your driver has built and placed its binaries and .cab file inside of `imx-iotcore\build\solution\iMXPlatform\Build\Release\ARM`
+1) Modify `build/tools/BuildBSP.bat` to copy your driver build results into the appropriate packaging directory.
 2) Open the Device Feature Manifest for your board (e.g. HummingBoard uses `imx-iotcore\build\board\HummingBoardEdge_iMX6Q_2GB\InputFMs\HummingBoardDeviceFM.xml`)
 3) Add a new PackageFile section to the XML and modify it with the package name set by legacyName in your wm.xml. Change FeatureID to match the other drivers in your board file, or create a new FeatureID for your feature.
 ```XML
