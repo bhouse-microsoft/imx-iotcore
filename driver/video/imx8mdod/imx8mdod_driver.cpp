@@ -69,7 +69,7 @@ DriverEntry (
         "(DriverObjectPtr = 0x%p, RegistryPathPtr = 0x%p)",
         DriverObjectPtr,
         RegistryPathPtr);
-    
+
     // Initialize DDI function pointers and dxgkrnl
     auto dodInit = KMDDOD_INITIALIZATION_DATA();
     dodInit.Version = DXGKDDI_INTERFACE_VERSION;

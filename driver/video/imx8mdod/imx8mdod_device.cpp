@@ -1867,7 +1867,7 @@ NTSTATUS DEVICE::DdiPresentDisplayOnly (
 
     auto thisPtr = reinterpret_cast<DEVICE*>(MiniportDeviceContextPtr);
 
-    LOG_TRACE(
+    LOG_PRESENT(
         "Received present call. (VidPnSourceId = %d, BytesPerPixel = %d, "
         "Pitch = %d, Flags.Rotate = %d, NumMoves = %d, NumDirtyRects = %d)",
         PresentDisplayOnlyPtr->VidPnSourceId,
