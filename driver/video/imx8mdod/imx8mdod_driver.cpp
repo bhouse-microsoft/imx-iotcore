@@ -108,6 +108,8 @@ DriverEntry (
     dodInit.DxgkDdiSystemDisplayWrite = DEVICE::DdiSystemDisplayWrite;
     dodInit.DxgkDdiPowerRuntimeControlRequest = DEVICE::DdiPowerRuntimeControlRequest;
 
+    dodInit.DxgkDdiEscape = DEVICE::DdiEscape;
+
     NTSTATUS status = DxgkInitializeDisplayOnlyDriver(
             DriverObjectPtr,
             RegistryPathPtr,

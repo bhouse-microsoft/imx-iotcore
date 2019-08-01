@@ -373,16 +373,20 @@ NTSTATUS DEVICE::DdiStartDevice (
         UNREFERENCED_PARAMETER(unmapStatus);
         NT_ASSERT(NT_SUCCESS(unmapStatus));
     });
+#endif // brh
 
-    PVOID hdmiRegistersPtr;
+    LARGE_INTEGER base;
+    base.QuadPart = HDMI_CTRL_BASE;
+
+    PVOID hdmiCtrlRegistersPtr;
     status = thisPtr->dxgkInterface.DxgkCbMapMemory(
             thisPtr->dxgkInterface.DeviceHandle,
-            hdmiMemoryResourcePtr->u.Memory.Start,
-            HDMI_REGISTERS_LENGTH,
+            base,
+            HDMI_CTRL_LENGTH,
             FALSE,
             FALSE,
             MmNonCached,
-            reinterpret_cast<PVOID*>(&hdmiRegistersPtr));
+            reinterpret_cast<PVOID*>(&hdmiCtrlRegistersPtr));
 
     if (!NT_SUCCESS(status)) {
         LOG_LOW_MEMORY(
@@ -390,21 +394,57 @@ NTSTATUS DEVICE::DdiStartDevice (
             "(status = %!STATUS!, "
             "hdmiRegistersPtr->u.Memory.Start = 0x%I64x, length=%d)",
             status,
-            hdmiMemoryResourcePtr->u.Memory.Start.QuadPart,
-            HDMI_REGISTERS_LENGTH);
+            HDMI_CTRL_BASE,
+            HDMI_CTRL_LENGTH);
 
         return status;
     }
-    auto unmapHdmiRegisters = FINALLY::DoUnless([&] {
+    auto unmapHdmiCtrlRegisters = FINALLY::DoUnless([&] {
         PAGED_CODE();
         NTSTATUS unmapStatus = thisPtr->dxgkInterface.DxgkCbUnmapMemory(
                 thisPtr->dxgkInterface.DeviceHandle,
-                hdmiRegistersPtr);
+                hdmiCtrlRegistersPtr);
 
         UNREFERENCED_PARAMETER(unmapStatus);
         NT_ASSERT(NT_SUCCESS(unmapStatus));
     });
-#endif // brh
+
+    // Map DCSS registers
+
+    base.QuadPart = DCSS_BASE;
+
+    PVOID dcssBase;
+    status = thisPtr->dxgkInterface.DxgkCbMapMemory(
+            thisPtr->dxgkInterface.DeviceHandle,
+            base,
+            DCSS_LENGTH,
+            FALSE,
+            FALSE,
+            MmNonCached,
+            reinterpret_cast<PVOID*>(&dcssBase));
+
+    if (!NT_SUCCESS(status)) {
+        LOG_LOW_MEMORY(
+            "Failed to map DCSS registers into system address space. "
+            "(status = %x, "
+            "start = 0x%I64x, length=%d)",
+            status,
+            DCSS_BASE,
+            DCSS_LENGTH);
+
+        return status;
+    }
+    auto unmapDcss = FINALLY::DoUnless([&] {
+        PAGED_CODE();
+        NTSTATUS unmapStatus = thisPtr->dxgkInterface.DxgkCbUnmapMemory(
+                thisPtr->dxgkInterface.DeviceHandle,
+                dcssBase);
+
+        UNREFERENCED_PARAMETER(unmapStatus);
+        NT_ASSERT(NT_SUCCESS(unmapStatus));
+    });
+
+    // Acquire frame buffer ownership
 
     status = thisPtr->dxgkInterface.DxgkCbAcquirePostDisplayOwnership(
             thisPtr->dxgkInterface.DeviceHandle,
@@ -481,18 +521,46 @@ NTSTATUS DEVICE::DdiStartDevice (
         MmUnmapIoSpace(biosFrameBufferPtr, frameBufferLength);
     });
 
+    LARGE_INTEGER maxAddress;
+    maxAddress.QuadPart = 0xFFFFFFFFULL;
+    // allocate another frame buffer for testing
+    void * frameBufferPtr = MmAllocateContiguousMemory(
+        frameBufferLength, maxAddress);
+
+    if (frameBufferPtr == nullptr) {
+        LOG_LOW_MEMORY(
+            "Failed to allocate frame buffer. "
+            "(frameBufferLength = %d)",
+            frameBufferLength);
+
+        return STATUS_NO_MEMORY;
+    }
+
+    auto freeFrameBuffer = FINALLY::DoUnless([&] {
+        PAGED_CODE();
+        MmFreeContiguousMemory(frameBufferPtr);
+    });
+
 #if 0 // brh
     unmapIpuRegisters.DoNot();
     thisPtr->ipuRegistersPtr = ipuRegistersPtr;
-
-    unmapHdmiRegisters.DoNot();
-    thisPtr->hdmiRegistersPtr = hdmiRegistersPtr;
 #endif
+
+    unmapHdmiCtrlRegisters.DoNot();
+    thisPtr->hdmiCtrlRegistersPtr = hdmiCtrlRegistersPtr;
+
+    unmapDcss.DoNot();
+    thisPtr->dcssBase = dcssBase;
 
     thisPtr->frameBufferLength = frameBufferLength;
 
+    thisPtr->biosFrameBufferPhysicalAddress =  thisPtr->dxgkDisplayInfo.PhysicAddress;
     unmapBiosFrameBuffer.DoNot();
     thisPtr->biosFrameBufferPtr = biosFrameBufferPtr;
+
+    freeFrameBuffer.DoNot();
+    thisPtr->frameBufferPhysicalAddress = MmGetPhysicalAddress(frameBufferPtr);
+    thisPtr->frameBufferPtr = frameBufferPtr;
 
 #if 0 // brh
     thisPtr->ipu1Conf = thisPtr->readIpuRegister(IPU_IPU_CONF_OFFSET);
@@ -2432,6 +2500,80 @@ NTSTATUS DEVICE::IsVidPnPathFieldsValid (
     }
 
     return STATUS_SUCCESS;
+}
+
+typedef struct {
+    void * hdmiCtrlBase;
+    void * dcssBase;
+    void * biosFrameBuffer;
+    PHYSICAL_ADDRESS biosFrameBufferPhysicalAddress;
+    void * frameBuffer;
+    PHYSICAL_ADDRESS frameBufferPhysicalAddress;
+} DriverEscape;
+
+_Use_decl_annotations_
+NTSTATUS DEVICE::DdiEscape (const HANDLE hAdapter, const DXGKARG_ESCAPE * pEscape)
+{
+    auto thisPtr = reinterpret_cast<DEVICE*>(hAdapter);
+
+    LOG_INFORMATION("DdiEscape was called");
+
+    KdBreakPoint();
+
+    if (pEscape->PrivateDriverDataSize != sizeof(DriverEscape))
+        return STATUS_INVALID_PARAMETER;
+
+    DriverEscape * escape = (DriverEscape *) pEscape->pPrivateDriverData;
+
+    escape->hdmiCtrlBase = NULL;
+    escape->dcssBase = NULL;
+    escape->biosFrameBuffer = NULL;
+    escape->frameBuffer = NULL;
+
+    MDL * pMdl = IoAllocateMdl(thisPtr->hdmiCtrlRegistersPtr, HDMI_CTRL_LENGTH, FALSE, FALSE, NULL);
+
+    if (pMdl != NULL) {
+        MmBuildMdlForNonPagedPool(pMdl);
+
+        escape->hdmiCtrlBase = MmMapLockedPagesSpecifyCache(pMdl, UserMode, MmNonCached, NULL, FALSE, HighPagePriority | MdlMappingNoExecute);
+
+        IoFreeMdl(pMdl);
+    }
+
+    pMdl = IoAllocateMdl(thisPtr->dcssBase, DCSS_LENGTH, FALSE, FALSE, NULL);
+
+    if (pMdl != NULL) {
+        MmBuildMdlForNonPagedPool(pMdl);
+
+        escape->dcssBase = MmMapLockedPagesSpecifyCache(pMdl, UserMode, MmNonCached, NULL, FALSE, HighPagePriority | MdlMappingNoExecute);
+
+        IoFreeMdl(pMdl);
+    }
+
+    pMdl = IoAllocateMdl(thisPtr->biosFrameBufferPtr, thisPtr->frameBufferLength, FALSE, FALSE, NULL);
+
+    if (pMdl != NULL) {
+        MmBuildMdlForNonPagedPool(pMdl);
+
+        escape->biosFrameBufferPhysicalAddress = thisPtr->biosFrameBufferPhysicalAddress;
+        escape->biosFrameBuffer = MmMapLockedPagesSpecifyCache(pMdl, UserMode, MmWriteCombined, NULL, FALSE, HighPagePriority | MdlMappingNoExecute);
+
+        IoFreeMdl(pMdl);
+    }
+
+    pMdl = IoAllocateMdl(thisPtr->frameBufferPtr,  thisPtr->frameBufferLength, FALSE, FALSE, NULL);
+
+    if (pMdl != NULL) {
+        MmBuildMdlForNonPagedPool(pMdl);
+
+        escape->frameBufferPhysicalAddress = thisPtr->frameBufferPhysicalAddress;
+        escape->frameBuffer = MmMapLockedPagesSpecifyCache(pMdl, UserMode, MmWriteCombined, NULL, FALSE, HighPagePriority | MdlMappingNoExecute);
+
+        IoFreeMdl(pMdl);
+    }
+
+    return STATUS_SUCCESS;
+
 }
 
 PAGED_SEGMENT_END; //===================================================

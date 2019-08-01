@@ -16,6 +16,12 @@
 //
 #pragma once
 
+#define HDMI_CTRL_BASE   0x32C00000ULL
+#define HDMI_CTRL_LENGTH 0x00100000ULL
+
+#define DCSS_BASE   0x32E00000UL
+#define DCSS_LENGTH 0x00030000UL
+
 class DEVICE {
 public: // NONPAGED
 
@@ -27,6 +33,8 @@ public: // NONPAGED
 
     static DXGKDDI_INTERRUPT_ROUTINE DdiInterruptRoutine;
     static DXGKDDI_DPC_ROUTINE DdiDpcRoutine;
+
+    static DXGKDDI_ESCAPE DdiEscape;
 
     __forceinline DEVICE (const DEVICE_OBJECT* PhysicalDeviceObjectPtr) :
         physicalDeviceObjectPtr(PhysicalDeviceObjectPtr),
@@ -107,11 +115,15 @@ private: // NONPAGED
 
 #if 0 // brh
     PVOID ipuRegistersPtr;
-    PVOID hdmiRegistersPtr;
 #endif
+    PVOID hdmiCtrlRegistersPtr;
+    PVOID dcssBase;
 
-    SIZE_T frameBufferLength;
+    ULONG frameBufferLength;
+    PHYSICAL_ADDRESS biosFrameBufferPhysicalAddress;
     VOID* biosFrameBufferPtr;       // must be freed with MmUnmapIoSpace
+    PHYSICAL_ADDRESS frameBufferPhysicalAddress;
+    VOID* frameBufferPtr;
 
 #if 0 // brh
     ULONG ipu1Conf;
