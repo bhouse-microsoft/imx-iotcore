@@ -256,6 +256,11 @@ copy %BUILD_ROOT%\imx8mdod\* %PKG_ROOT%\Display\ >NUL
 if errorlevel 1 (set FAILURE=imx8mdod & goto ERROR)
 copy %REPO_ROOT%\driver\video\imx8mdod\imx8mdod.wm.xml %PKG_ROOT%\Display\ >NUL
 
+mkdir %PKG_ROOT%\IDD >NUL 2>NUL
+copy %BUILD_ROOT%\imx8midd\* %PKG_ROOT%\IDD\ >NUL
+if errorlevel 1 (set FAILURE=imx8midd & goto ERROR)
+copy %REPO_ROOT%\driver\video\imx8midd\imx8midd.wm.xml %PKG_ROOT%\IDD\ >NUL
+
 :: Copy HAL Extension Packages
 echo Copying HAL Extension Packages to %PKG_ROOT%
 mkdir %PKG_ROOT%\HalExtDma >NUL 2>NUL
