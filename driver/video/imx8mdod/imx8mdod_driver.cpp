@@ -56,6 +56,8 @@ void MX6DodDdiUnload ()
 PAGED_SEGMENT_END; //=====================================================
 INIT_SEGMENT_BEGIN; //====================================================
 
+bool gNoLoad = false;
+
 _Use_decl_annotations_
 NTSTATUS
 DriverEntry (
@@ -64,7 +66,10 @@ DriverEntry (
     )
 {
     PAGED_CODE();
-     
+
+    if (gNoLoad)
+        return STATUS_INVALID_PARAMETER;
+
     LOG_INFORMATION(
         "(DriverObjectPtr = 0x%p, RegistryPathPtr = 0x%p)",
         DriverObjectPtr,

@@ -2509,6 +2509,25 @@ typedef struct {
     PHYSICAL_ADDRESS biosFrameBufferPhysicalAddress;
     void * frameBuffer;
     PHYSICAL_ADDRESS frameBufferPhysicalAddress;
+} GetInfoEscape;
+
+typedef struct {
+    void * virtualAddress;
+    PHYSICAL_ADDRESS physicalAddress;
+} MapAddressEscape;
+
+typedef struct {
+    void * virtualAddress;
+    ULONG size;
+} FlushEscape;
+
+typedef struct {
+    int code; // 0 info, 1 map
+    union {
+        GetInfoEscape info;
+        MapAddressEscape mapAddress;
+        FlushEscape flush;
+    };
 } DriverEscape;
 
 _Use_decl_annotations_
@@ -2518,58 +2537,99 @@ NTSTATUS DEVICE::DdiEscape (const HANDLE hAdapter, const DXGKARG_ESCAPE * pEscap
 
     LOG_INFORMATION("DdiEscape was called");
 
-    KdBreakPoint();
-
     if (pEscape->PrivateDriverDataSize != sizeof(DriverEscape))
         return STATUS_INVALID_PARAMETER;
 
     DriverEscape * escape = (DriverEscape *) pEscape->pPrivateDriverData;
 
-    escape->hdmiCtrlBase = NULL;
-    escape->dcssBase = NULL;
-    escape->biosFrameBuffer = NULL;
-    escape->frameBuffer = NULL;
+    if (escape->code == 0) {
+        escape->info.hdmiCtrlBase = NULL;
+        escape->info.dcssBase = NULL;
+        escape->info.biosFrameBuffer = NULL;
+        escape->info.frameBuffer = NULL;
 
-    MDL * pMdl = IoAllocateMdl(thisPtr->hdmiCtrlRegistersPtr, HDMI_CTRL_LENGTH, FALSE, FALSE, NULL);
+        MDL * pMdl = IoAllocateMdl(thisPtr->hdmiCtrlRegistersPtr, HDMI_CTRL_LENGTH, FALSE, FALSE, NULL);
 
-    if (pMdl != NULL) {
-        MmBuildMdlForNonPagedPool(pMdl);
+        if (pMdl != NULL) {
+            MmBuildMdlForNonPagedPool(pMdl);
 
-        escape->hdmiCtrlBase = MmMapLockedPagesSpecifyCache(pMdl, UserMode, MmNonCached, NULL, FALSE, HighPagePriority | MdlMappingNoExecute);
+            escape->info.hdmiCtrlBase = MmMapLockedPagesSpecifyCache(pMdl, UserMode, MmNonCached, NULL, FALSE, HighPagePriority | MdlMappingNoExecute);
 
-        IoFreeMdl(pMdl);
+            IoFreeMdl(pMdl);
+        }
+
+        pMdl = IoAllocateMdl(thisPtr->dcssBase, DCSS_LENGTH, FALSE, FALSE, NULL);
+
+        if (pMdl != NULL) {
+            MmBuildMdlForNonPagedPool(pMdl);
+
+            escape->info.dcssBase = MmMapLockedPagesSpecifyCache(pMdl, UserMode, MmNonCached, NULL, FALSE, HighPagePriority | MdlMappingNoExecute);
+
+            IoFreeMdl(pMdl);
+        }
+
+        pMdl = IoAllocateMdl(thisPtr->biosFrameBufferPtr, thisPtr->frameBufferLength, FALSE, FALSE, NULL);
+
+        if (pMdl != NULL) {
+            MmBuildMdlForNonPagedPool(pMdl);
+
+            escape->info.biosFrameBufferPhysicalAddress = thisPtr->biosFrameBufferPhysicalAddress;
+            escape->info.biosFrameBuffer = MmMapLockedPagesSpecifyCache(pMdl, UserMode, MmWriteCombined, NULL, FALSE, HighPagePriority | MdlMappingNoExecute);
+
+            IoFreeMdl(pMdl);
+        }
+
+        pMdl = IoAllocateMdl(thisPtr->frameBufferPtr,  thisPtr->frameBufferLength, FALSE, FALSE, NULL);
+
+        if (pMdl != NULL) {
+            MmBuildMdlForNonPagedPool(pMdl);
+
+            escape->info.frameBufferPhysicalAddress = thisPtr->frameBufferPhysicalAddress;
+            escape->info.frameBuffer = MmMapLockedPagesSpecifyCache(pMdl, UserMode, MmWriteCombined, NULL, FALSE, HighPagePriority | MdlMappingNoExecute);
+
+            IoFreeMdl(pMdl);
+        }
     }
-
-    pMdl = IoAllocateMdl(thisPtr->dcssBase, DCSS_LENGTH, FALSE, FALSE, NULL);
-
-    if (pMdl != NULL) {
-        MmBuildMdlForNonPagedPool(pMdl);
-
-        escape->dcssBase = MmMapLockedPagesSpecifyCache(pMdl, UserMode, MmNonCached, NULL, FALSE, HighPagePriority | MdlMappingNoExecute);
-
-        IoFreeMdl(pMdl);
+    else if (escape->code == 1) {
+        escape->mapAddress.physicalAddress = MmGetPhysicalAddress(escape->mapAddress.virtualAddress);
     }
+    else if (escape->code == 2) {
 
-    pMdl = IoAllocateMdl(thisPtr->biosFrameBufferPtr, thisPtr->frameBufferLength, FALSE, FALSE, NULL);
+        LARGE_INTEGER freq;
+        LARGE_INTEGER startCount;
+        startCount = KeQueryPerformanceCounter(&freq);
 
-    if (pMdl != NULL) {
-        MmBuildMdlForNonPagedPool(pMdl);
+        MDL * pMdl = IoAllocateMdl(escape->flush.virtualAddress, escape->flush.size, FALSE, FALSE, NULL);
+//        LARGE_INTEGER allocateCount = KeQueryPerformanceCounter(NULL);
 
-        escape->biosFrameBufferPhysicalAddress = thisPtr->biosFrameBufferPhysicalAddress;
-        escape->biosFrameBuffer = MmMapLockedPagesSpecifyCache(pMdl, UserMode, MmWriteCombined, NULL, FALSE, HighPagePriority | MdlMappingNoExecute);
+        if (pMdl != NULL) {
 
-        IoFreeMdl(pMdl);
+            MmBuildMdlForNonPagedPool(pMdl);
+//            LARGE_INTEGER buildCount = KeQueryPerformanceCounter(NULL);
+
+            KeFlushIoBuffers(pMdl, FALSE, TRUE);
+//            LARGE_INTEGER flushCount = KeQueryPerformanceCounter(NULL);
+
+            IoFreeMdl(pMdl);
+//            LARGE_INTEGER freeCount = KeQueryPerformanceCounter(NULL);
+
+//            freeCount.QuadPart -= flushCount.QuadPart;
+//            flushCount.QuadPart -= buildCount.QuadPart;
+//            buildCount.QuadPart -= allocateCount.QuadPart;
+//            allocateCount.QuadPart -= startCount.QuadPart;
+
+//            unsigned long freeTime = (unsigned long) ((freeCount.QuadPart * 1000000LL) / freq.QuadPart);
+//            unsigned long flushTime = (unsigned long) ((flushCount.QuadPart * 1000000LL) / freq.QuadPart);
+//            unsigned long buildTime = (unsigned long) ((buildCount.QuadPart * 1000000LL) / freq.QuadPart);
+//            unsigned long allocateTime = (unsigned long) ((allocateCount.QuadPart * 1000000LL) / freq.QuadPart);
+
+//            DbgPrint("%u %u %u %u\n", allocateTime, buildTime, flushTime, freeTime );
+
+
+        }
     }
-
-    pMdl = IoAllocateMdl(thisPtr->frameBufferPtr,  thisPtr->frameBufferLength, FALSE, FALSE, NULL);
-
-    if (pMdl != NULL) {
-        MmBuildMdlForNonPagedPool(pMdl);
-
-        escape->frameBufferPhysicalAddress = thisPtr->frameBufferPhysicalAddress;
-        escape->frameBuffer = MmMapLockedPagesSpecifyCache(pMdl, UserMode, MmWriteCombined, NULL, FALSE, HighPagePriority | MdlMappingNoExecute);
-
-        IoFreeMdl(pMdl);
+    else {
+        return STATUS_INVALID_PARAMETER;
     }
 
     return STATUS_SUCCESS;

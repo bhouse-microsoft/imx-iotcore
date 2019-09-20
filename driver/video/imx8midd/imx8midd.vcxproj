@@ -26,7 +26,7 @@
     <Configuration>Debug</Configuration>
     <Platform Condition="'$(Platform)' == ''">ARM64</Platform>
     <RootNamespace>imx8midd</RootNamespace>
-	<ProjectName>imx8midd</ProjectName>
+    <ProjectName>imx8midd</ProjectName>
     <WindowsTargetPlatformVersion>$(LatestTargetPlatformVersion)</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -57,6 +57,18 @@
     <Import Project="..\..\..\build\common.props" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM'">
+    <IncludePath>$(DDK_INC_PATH);$(IncludePath)</IncludePath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM'">
+    <IncludePath>$(DDK_INC_PATH);$(IncludePath)</IncludePath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">
+    <IncludePath>$(DDK_INC_PATH);$(IncludePath)</IncludePath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">
+    <IncludePath>$(DDK_INC_PATH);$(IncludePath)</IncludePath>
+  </PropertyGroup>
   <ItemDefinitionGroup>
     <ClCompile>
       <WppEnabled>false</WppEnabled>
@@ -74,10 +86,14 @@
     <FilesToPackage Include="$(TargetPath)" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="imx8midd_context.cpp" />
+    <ClCompile Include="imx8midd_d3ddevice.cpp" />
     <ClCompile Include="imx8midd_driver.cpp" />
+    <ClCompile Include="imx8midd_processor.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="imx8midd_driver.h" />
+    <ClInclude Include="warp10.h" />
   </ItemGroup>
   <ItemGroup>
     <PkgGen Include="imx8midd.wm.xml">
