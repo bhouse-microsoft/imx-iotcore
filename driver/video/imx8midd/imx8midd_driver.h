@@ -16,8 +16,6 @@
 #include <vector>
 
 #include "Trace.h"
-#include "dxgidwm.h"
-#include "Warp10.h"
 
 namespace Microsoft
 {
@@ -49,28 +47,15 @@ namespace Microsoft
             ~Direct3DDevice();
             HRESULT Init();
 
-            LUID AdapterLuid;
-            Microsoft::WRL::ComPtr<IDXGIFactory5> DxgiFactory;
-            Microsoft::WRL::ComPtr<IDXGIAdapter1> Adapter;
-            Microsoft::WRL::ComPtr<ID3D11Device> Device;
-            Microsoft::WRL::ComPtr<IDXGIAdapterDWM> AdapterDWM;
-            Microsoft::WRL::ComPtr<ID3D11DeviceContext> DeviceContext;
-            Microsoft::WRL::ComPtr<IWarpPrivateAPI> WarpPrivateAPI;
-            HANDLE CompletionEvent;
-            HANDLE khAdapterDWM;
+            LUID m_AdapterLuid;
+            Microsoft::WRL::ComPtr<IDXGIFactory5> m_DxgiFactory;
+            Microsoft::WRL::ComPtr<IDXGIAdapter1> m_Adapter;
+            Microsoft::WRL::ComPtr<ID3D11Device> m_Device;
+            Microsoft::WRL::ComPtr<ID3D11DeviceContext> m_DeviceContext;
 
-            uint32_t * DcssBase;
-            uint32_t * DprBase;
-            uint32_t * FrameBufferReg;
-            uint32_t * FrameBuffer; // 0x500 x 0x2D0
-            PHYSICAL_ADDRESS FrameBufferPhysicalAddress;
-            uint32_t * BiosFrameBuffer;
-            PHYSICAL_ADDRESS BiosFrameBufferPhysicalAddress;
-
-            Microsoft::WRL::ComPtr<ID3D11Texture2D> StagingTexture;
-            Microsoft::WRL::ComPtr<ID3D11DeviceContext> ImmediateContext;
+            Microsoft::WRL::ComPtr<ID3D11Texture2D> m_StagingTexture;
+            Microsoft::WRL::ComPtr<ID3D11DeviceContext> m_ImmediateContext;
             IndirectDeviceContext * m_pContext;
-
         };
 
         /// <summary>
@@ -92,7 +77,6 @@ namespace Microsoft
 
         protected:
 
-            WDFDEVICE m_WdfDevice;
             IDDCX_ADAPTER m_Adapter;
             IDDCX_MONITOR m_Monitor;
 
@@ -108,9 +92,14 @@ namespace Microsoft
             static IndirectDeviceContext * Get(IDDCX_ADAPTER);
 
         public:
-            bool     m_modeCommitted;
-            uint32_t m_modeWidth;
-            uint32_t m_modeHeight;
+            bool       m_modeCommitted;
+            uint32_t   m_modeWidth;
+            uint32_t   m_modeHeight;
+			void *	   m_pDcssBase;
+			volatile uint32_t * m_pFrameBufferReg;
+			uint32_t   m_uefiFrameBuffer;
+
+			WDFDEVICE m_WdfDevice;
 
         };
 
@@ -154,32 +143,4 @@ struct IndirectDeviceContextWrapper
 
 // This macro creates the methods for accessing an IndirectDeviceContextWrapper as a context for a WDF object
 WDF_DECLARE_CONTEXT_TYPE(IndirectDeviceContextWrapper);
-
-typedef struct {
-    void * hdmiCtrlBase;
-    void * dcssBase;
-    void * biosFrameBuffer;
-    PHYSICAL_ADDRESS biosFrameBufferPhysicalAddress;
-    void * frameBuffer;
-    PHYSICAL_ADDRESS frameBufferPhysicalAddress;
-} GetInfoEscape;
-
-typedef struct {
-    void * virtualAddress;
-    PHYSICAL_ADDRESS physicalAddress;
-} MapAddressEscape;
-
-typedef struct {
-    void * virtualAddress;
-    ULONG size;
-} FlushEscape;
-
-typedef struct {
-    int code; // 0 info, 1 map
-    union {
-        GetInfoEscape info;
-        MapAddressEscape mapAddress;
-        FlushEscape flush;
-    };
-} DriverEscape;
 

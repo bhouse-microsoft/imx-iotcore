@@ -27,6 +27,8 @@ extern "C" DRIVER_INITIALIZE DriverEntry;
 
 EVT_WDF_DRIVER_DEVICE_ADD IddSampleDeviceAdd;
 EVT_WDF_DEVICE_D0_ENTRY IddSampleDeviceD0Entry;
+EVT_WDF_DEVICE_PREPARE_HARDWARE IddSampleDevicePrepareHardware;
+EVT_WDF_DEVICE_RELEASE_HARDWARE IddSampleDeviceReleaseHardware;
 
 EVT_IDD_CX_ADAPTER_INIT_FINISHED IddSampleAdapterInitFinished;
 EVT_IDD_CX_ADAPTER_COMMIT_MODES IddSampleAdapterCommitModes;
@@ -66,7 +68,7 @@ extern "C" NTSTATUS DriverEntry(
         IddSampleDeviceAdd
     );
 
-    Status = WdfDriverCreate(pDriverObject, pRegistryPath, &Attributes, &Config, WDF_NO_HANDLE);
+	Status = WdfDriverCreate(pDriverObject, pRegistryPath, &Attributes, &Config, WDF_NO_HANDLE);
     if (!NT_SUCCESS(Status))
     {
         return Status;
@@ -83,10 +85,12 @@ NTSTATUS IddSampleDeviceAdd(WDFDRIVER Driver, PWDFDEVICE_INIT pDeviceInit)
 
     UNREFERENCED_PARAMETER(Driver);
 
-    // Register for power callbacks - in this sample only power-on is needed
+	// Register for power callbacks - in this sample only power-on is needed
     WDF_PNPPOWER_EVENT_CALLBACKS_INIT(&PnpPowerCallbacks);
     PnpPowerCallbacks.EvtDeviceD0Entry = IddSampleDeviceD0Entry;
-    WdfDeviceInitSetPnpPowerEventCallbacks(pDeviceInit, &PnpPowerCallbacks);
+	PnpPowerCallbacks.EvtDevicePrepareHardware = IddSampleDevicePrepareHardware;
+	PnpPowerCallbacks.EvtDeviceReleaseHardware = IddSampleDeviceReleaseHardware;
+	WdfDeviceInitSetPnpPowerEventCallbacks(pDeviceInit, &PnpPowerCallbacks);
 
     IDD_CX_CLIENT_CONFIG IddConfig;
     IDD_CX_CLIENT_CONFIG_INIT(&IddConfig);
@@ -145,82 +149,55 @@ NTSTATUS IddSampleDeviceD0Entry(WDFDEVICE WdfDevice, WDF_POWER_DEVICE_STATE Prev
 
     // This function is called by WDF to start the device in the fully-on power state.
 
-    IndirectDeviceContext * pContext = IndirectDeviceContext::Get(WdfDevice);
+	IndirectDeviceContext * pContext = IndirectDeviceContext::Get(WdfDevice);
     pContext->InitAdapter();
 
     return STATUS_SUCCESS;
 }
 
-#pragma region Direct3DDevice
-
-
-#pragma endregion
-
-
-#if 0
-HRESULT
-CWarpLockSubresource::Lock()
+_Use_decl_annotations_
+NTSTATUS IddSampleDevicePrepareHardware(WDFDEVICE WdfDevice, WDFCMRESLIST ResourcesRaw, WDFCMRESLIST ResourcesTranslated)
 {
-    HRESULT hr;
-    WarpExtension_LockSubresource warpExtLock;
+	UNREFERENCED_PARAMETER(ResourcesRaw);
+	UNREFERENCED_PARAMETER(ResourcesTranslated);
 
-    Assert(!IsLocked());
+	IndirectDeviceContext * pContext = IndirectDeviceContext::Get(WdfDevice);
 
-    //
-    // Warp needs to know what resource we want to lock, and due to runtime
-    // reasons we cannot pass it to the escape. Therefore we call
-    // SetEvictionPriority() and then the escape -- the former will be
-    // what the escape routine operates on.
-    //
-    m_pIDXGIResource->SetEvictionPriority(DXGI_RESOURCE_PRIORITY_NORMAL);
+	ULONG resourceCount = WdfCmResourceListGetCount(ResourcesTranslated);
 
-    warpExtLock.Subresource = m_subresourceId;
-    warpExtLock.MapType = D3D10_MAP_READ;
-    warpExtLock.MapFlags = 0;
-    warpExtLock.pMappedTex2D.pData = nullptr;
-    warpExtLock.pMappedTex2D.RowPitch = 0;
+	pContext->m_pDcssBase = NULL;
+	pContext->m_pFrameBufferReg = NULL;
+	pContext->m_uefiFrameBuffer = 0;
 
-    //
-    // Call the Warp escape to map the texture.
-    //
-    IFC(m_pWarpPrivateAPI->WarpEscape(&warpExtLock));
+	for (ULONG i = 0; i < resourceCount; i++)
+	{
+		PCM_PARTIAL_RESOURCE_DESCRIPTOR desc = WdfCmResourceListGetDescriptor(ResourcesTranslated, i);
 
-    Assert(warpExtLock.pMappedTex2D.pData && warpExtLock.pMappedTex2D.RowPitch);
+		if (desc->Type == CmResourceTypeMemory && desc->u.Memory.Start.QuadPart == 0x32e00000ULL && desc->u.Memory.Length == 0x40000) {
+			NTSTATUS status = WdfDeviceMapIoSpace(WdfDevice, desc->u.Memory.Start, desc->u.Memory.Length, MmNonCached, &pContext->m_pDcssBase);
+			if (status == STATUS_SUCCESS)
+			{
+				pContext->m_pFrameBufferReg = (uint32_t *)((uint8_t *) pContext->m_pDcssBase + 0x180c0);
+				pContext->m_uefiFrameBuffer = WDF_READ_REGISTER_ULONG(WdfDevice, (PULONG) pContext->m_pFrameBufferReg);
+			}
+		}
+	}
 
-    m_mappedTexture = warpExtLock.pMappedTex2D;
-
-Cleanup:
-    RRETURN(hr);
+	return STATUS_SUCCESS;
 }
 
-HRESULT
-CWarpLockSubresource::Unlock()
+_Use_decl_annotations_
+NTSTATUS IddSampleDeviceReleaseHardware(WDFDEVICE WdfDevice, WDFCMRESLIST ResourcesTranslated)
 {
-    HRESULT hr;
-    WarpExtension_UnlockSubresource warpExtUnlock;
+	UNREFERENCED_PARAMETER(ResourcesTranslated);
 
-    Assert(IsLocked());
+	IndirectDeviceContext * pContext = IndirectDeviceContext::Get(WdfDevice);
 
-    //
-    // Warp needs to know what resource we want to unlock (see comment in
-    // Lock() method).
-    //
-    m_pIDXGIResource->SetEvictionPriority(DXGI_RESOURCE_PRIORITY_NORMAL);
+	if (pContext->m_pDcssBase != NULL)
+		WdfDeviceUnmapIoSpace(WdfDevice, pContext->m_pDcssBase, 0x40000);
 
-    warpExtUnlock.Subresource = m_subresourceId;
-
-    //
-    // Call the Warp escape to unmap the texture.
-    //
-    IFC(m_pWarpPrivateAPI->WarpEscape(&warpExtUnlock));
-
-    m_mappedTexture.pData = nullptr;
-    m_mappedTexture.RowPitch = 0;
-
-Cleanup:
-    RRETURN(hr);
+	return STATUS_SUCCESS;
 }
-#endif
 
 
 #pragma region DDI Callbacks
@@ -228,7 +205,7 @@ Cleanup:
 _Use_decl_annotations_
 NTSTATUS IddSampleAdapterInitFinished(IDDCX_ADAPTER AdapterObject, const IDARG_IN_ADAPTER_INIT_FINISHED* pInArgs)
 {
-    // This is called when the OS has finished setting up the adapter for use by the IddCx driver. It's now possible
+	// This is called when the OS has finished setting up the adapter for use by the IddCx driver. It's now possible
     // to report attached monitors.
 
     if (NT_SUCCESS(pInArgs->AdapterInitStatus))
@@ -242,8 +219,8 @@ NTSTATUS IddSampleAdapterInitFinished(IDDCX_ADAPTER AdapterObject, const IDARG_I
 
 _Use_decl_annotations_
 NTSTATUS IddSampleAdapterCommitModes(IDDCX_ADAPTER AdapterObject, const IDARG_IN_COMMITMODES* pInArgs)
-{
-    return IndirectDeviceContext::Get(AdapterObject)->CommitModes(pInArgs);
+{	
+	return IndirectDeviceContext::Get(AdapterObject)->CommitModes(pInArgs);
 }
 
 _Use_decl_annotations_
@@ -310,7 +287,7 @@ NTSTATUS IddSampleMonitorGetDefaultModes(IDDCX_MONITOR MonitorObject, const IDAR
     UNREFERENCED_PARAMETER(pInArgs);
     UNREFERENCED_PARAMETER(pOutArgs);
 
-    // Should never be called since we create a single monitor with a known EDID in this sample driver.
+	// Should never be called since we create a single monitor with a known EDID in this sample driver.
 
     // ==============================
     // TODO: In a real driver, this function would be called to generate monitor modes for a monitor with no EDID.
@@ -353,7 +330,7 @@ NTSTATUS IddSampleMonitorQueryModes(IDDCX_MONITOR MonitorObject, const IDARG_IN_
 {
     UNREFERENCED_PARAMETER(MonitorObject);
 
-    // For now, we will report only only mode which matches the mode set by UEFI
+	// For now, we will report only only mode which matches the mode set by UEFI
 
     // TODO: Make escape down to display only driver to get boot mode settings
     //       For now, we hard code 1280 x 720

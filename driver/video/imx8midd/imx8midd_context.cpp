@@ -98,8 +98,7 @@ void IndirectDeviceContext::InitAdapter()
     AdapterCaps.EndPointDiagnostics.pEndPointModelName = L"IddSample Model";
 
     // Prefer physically contiguous buffers
-//    AdapterCaps.Flags = (IDDCX_ADAPTER_FLAGS) 0x8;
-    AdapterCaps.Flags = (IDDCX_ADAPTER_FLAGS) 0;
+    AdapterCaps.Flags = (IDDCX_ADAPTER_FLAGS) 0x8;
 
     // Declare your hardware and firmware versions (required)
     IDDCX_ENDPOINT_VERSION Version = {};

@@ -73,7 +73,7 @@ void SwapChainProcessor::RunCore()
 {
     // Get the DXGI device interface
     ComPtr<IDXGIDevice2> DxgiDevice;
-    HRESULT hr = m_pDevice->Device.As(&DxgiDevice);
+    HRESULT hr = m_pDevice->m_Device.As(&DxgiDevice);
     if (FAILED(hr))
     {
         return;
@@ -133,42 +133,56 @@ void SwapChainProcessor::RunCore()
 
             // Physical address is valid if non-zero.  We expect the high part of the address to be zero as we have
             // initialized the video memory system to reserve the physical heap only within the lower 4G of memory.
-            if (address.HighPart == 0 && address.LowPart != 0 && 0) {
-
-                uint32_t physicalAddress =  address.LowPart;
+            if (address.HighPart == 0 && address.LowPart != 0 && m_pContext->m_pFrameBufferReg != NULL) {
 
                 // Flip to the frame
-                volatile uint32_t * frameBufferReg = (uint32_t *) ((size_t) m_pDevice->DprBase + 0xc0);
-                *frameBufferReg =physicalAddress;
+				WDF_WRITE_REGISTER_ULONG(m_pContext->m_WdfDevice, (PULONG)m_pContext->m_pFrameBufferReg, address.LowPart);
 
-            } else if (m_pDevice->BiosFrameBuffer != nullptr) {
-                // Copy to staging buffer and then copy into bios frame buffer (double copy)
+            } else {
+                // We need to copy our acquired surface to a staging buffer and then copy the staging buffer to the
+                // bios frame buffer.
+                // NOTE: we could reduce the amount we need to copy by using the dirty rect
+                // information.  Since this path is not the exepcted path, we are keeping this simple for now and thus
+                // copy the entire buffer.
                 AcquiredBuffer.Attach(Buffer.MetaData.pSurface);
 
                 ID3D11Resource * source = nullptr;
                 hr = AcquiredBuffer->QueryInterface(IID_PPV_ARGS(&source));
 
-                m_pDevice->ImmediateContext->CopyResource(m_pDevice->StagingTexture.Get(), source);
+                m_pDevice->m_ImmediateContext->CopyResource(m_pDevice->m_StagingTexture.Get(), source);
 
                 D3D11_MAPPED_SUBRESOURCE mapping;
-                hr = m_pDevice->ImmediateContext->Map(m_pDevice->StagingTexture.Get(), 0, D3D11_MAP_READ, 0, &mapping);
+                hr = m_pDevice->m_ImmediateContext->Map(m_pDevice->m_StagingTexture.Get(), 0, D3D11_MAP_READ, 0, &mapping);
 
                 if (SUCCEEDED(hr)) {
                     size_t rowBytes = m_pContext->m_modeWidth * sizeof(uint32_t);
 
                     // We expect our row pitch to match
                     if (mapping.RowPitch == rowBytes) {
+#if 0
+						// TODO: map frame buffer into driver's address space
+						//       this requires that we also:
+						//           report the frame buffer address range as a resource in ACPI
+						//           add a mechanism to DXGKRNL that will allow device to report that it is not boot device
                         size_t totalBytes = rowBytes * m_pContext->m_modeHeight;
-                        uint8_t * dst = (uint8_t *) m_pDevice->BiosFrameBuffer;
+                        uint8_t * dst = (uint8_t *) m_pDevice->m_BiosFrameBuffer;
                         memcpy(dst, mapping.pData, totalBytes);
+#endif
 
-                        m_pDevice->ImmediateContext->Unmap(m_pDevice->StagingTexture.Get(), 0);
+                        m_pDevice->m_ImmediateContext->Unmap(m_pDevice->m_StagingTexture.Get(), 0);
                     } else {
                         // unexpected ... perhaps we should paint the frame buffer blue to indicate the situation
                     }
                 }
-            } else {
-                // unexpected ... perhaps we should paint the frame buffer red to indicate the situation
+
+				if (m_pContext->m_pFrameBufferReg != NULL)
+				{
+					if (WDF_READ_REGISTER_ULONG(m_pContext->m_WdfDevice, (PULONG)m_pContext->m_pFrameBufferReg) != m_pContext->m_uefiFrameBuffer)
+						WDF_WRITE_REGISTER_ULONG(m_pContext->m_WdfDevice, (PULONG)m_pContext->m_pFrameBufferReg, m_pContext->m_uefiFrameBuffer);
+				}
+
+                AcquiredBuffer->Release();
+
             }
 
             hr = IddCxSwapChainFinishedProcessingFrame(m_hSwapChain);

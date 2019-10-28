@@ -93,7 +93,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="imx8midd_driver.h" />
-    <ClInclude Include="warp10.h" />
   </ItemGroup>
   <ItemGroup>
     <PkgGen Include="imx8midd.wm.xml">
