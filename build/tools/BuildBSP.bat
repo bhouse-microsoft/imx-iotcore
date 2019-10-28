@@ -251,11 +251,6 @@ copy %BUILD_ROOT%\OpteeTrEE\* %PKG_ROOT%\OPTEE\ >NUL
 if errorlevel 1 (set FAILURE=OpteeTrEE & goto ERROR)
 copy %REPO_ROOT%\driver\TrEE\TrEE\OpteeTrEE.wm.xml %PKG_ROOT%\OPTEE\ >NUL
 
-mkdir %PKG_ROOT%\Display >NUL 2>NUL
-copy %BUILD_ROOT%\imx8mdod\* %PKG_ROOT%\Display\ >NUL
-if errorlevel 1 (set FAILURE=imx8mdod & goto ERROR)
-copy %REPO_ROOT%\driver\video\imx8mdod\imx8mdod.wm.xml %PKG_ROOT%\Display\ >NUL
-
 mkdir %PKG_ROOT%\IDD >NUL 2>NUL
 copy %BUILD_ROOT%\imx8midd\* %PKG_ROOT%\IDD\ >NUL
 if errorlevel 1 (set FAILURE=imx8midd & goto ERROR)

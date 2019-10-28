@@ -66,11 +66,6 @@
           <FeatureID>IMX_DRIVERS</FeatureID>
         </FeatureIDs>
       </PackageFile>
-      <PackageFile Path="%BSPPKG_DIR%" Name="NXP.iMX.imx8mdod.cab">
-        <FeatureIDs>
-          <FeatureID>IMX_DRIVERS</FeatureID>
-        </FeatureIDs>
-      </PackageFile>
       <PackageFile Path="%BSPPKG_DIR%" Name="NXP.iMX.imx8midd.cab">
         <FeatureIDs>
           <FeatureID>IMX_DRIVERS</FeatureID>
